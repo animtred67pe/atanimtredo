@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>try pan</title>
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+			}
+			.jj {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+			}
+		</style>
+	</head>
+	<body>
+		<div class="jj">
+			<label>left</label>
+			<input type="range" id="dfg" name="" max="100" min="-100" value="0">
+			<label>right</label>
+			<button onclick="test()">test</button>
+		</div>
+		<script>
+			var audioContext = new AudioContext();
+			var soundss = null;
+			var _decodeAudio = function(k) {
+				return new Promise(function(resolve, reject) {
+					audioContext.decodeAudioData(k, function(buffer) {
+						resolve(buffer)
+					}, function(err2) {
+						reject("Could not decode audio: " + err2)
+					})
+				});
+			}
+			fetch("https://assets.scratch.mit.edu/internalapi/asset/f8e9a4862f16d6e0bb58e8595cd5a4ad.wav/get/").then(function(r) {
+				return r.arrayBuffer()
+			}).then(function(buffer) {
+				return _decodeAudio(buffer)
+			}).then(function(sound) {
+				soundss = sound;
+			});
+
+			var dfg = document.getElementById('dfg');
+
+			var _destination = audioContext.createGain();
+			_destination.connect(audioContext.destination);
+
+			var inputNode = audioContext.createGain();
+			var leftGain = audioContext.createGain();
+			var rightGain = audioContext.createGain();
+			var channelMerger = audioContext.createChannelMerger(2);
+			inputNode.connect(leftGain);
+			inputNode.connect(rightGain);
+			leftGain.connect(channelMerger, 0, 0);
+			rightGain.connect(channelMerger, 0, 1);
+			channelMerger.connect(_destination);
+
+			setInterval(function () {
+
+				const p = (+dfg.value) / 100;
+
+				if (p > 0) {
+					leftGain.gain.value = 1 - p;
+					rightGain.gain.value = 1;
+				} else {
+					rightGain.gain.value = p + 1;
+					leftGain.gain.value = 1;
+				}
+
+			}, 5);
+
+
+			function test() {
+				if (!soundss) return;
+				var source = audioContext.createBufferSource();
+				source.buffer = soundss;
+				source.connect(inputNode);
+				source.start();
+			}
+		</script>
+	</body>
+</html>
