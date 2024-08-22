@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Agar.io - Anim Tred Tools</title>
+		<style>
+			body{
+			    margin: 0;
+			    overflow: hidden;
+			    background: #000;
+			}
+			#demo{
+			    margin: 5px;
+			    position: fixed;
+			    bottom: 0px;
+			    background: #000;
+			    color: #fff;
+			    padding: 3px;
+			    font-family: monospace;
+			}
+			button{
+			    margin: 15px;
+			    position: fixed;
+			    left: 0;
+			    padding: 3px;
+			}
+			input{
+			    margin: 15px;
+			    position: fixed;
+			    left: 120px;
+			    padding: 3px;
+			}
+		</style>
+	</head>
+	<body onload="game.startGame()">
+		<canvas id="Stage" onmousemove="game.cnvs_getCoordinates(event)"></canvas>
+		<h2 id="demo"></h2>
+		<button onclick="game.RespawnPlayer()">RespawnPlayer</button>
+		<script>
+			var game = (function() {
+		    var i, mi, siz,xp,yp,sx,sy,speed,dx,dy,pdir,repeat_end,repeat_end2,repeat_end3,Non_Leg,typ,colorJF,radius_J,distG,Scores,HighScores,timeSecX,isMaxSizeH,POSJX;
+		    HighScores = 0;
+		    var Level_Size_Collision = true;
+		    var Collects_Max = 10000;
+		    var VirusR_Max = 130;
+		    var TimerH = 0;
+		    var KeyPressH = null;
+		    var splitKey = 0;
+		    var Level_Size = 10000;
+		    var MyPlayerX = 0;
+		    var MyPlayerY = 0;
+		    var MyPlayerUsername = "Username";
+		    var Mouse_X_Position = 0;
+		    var Mouse_Y_Position = 0;
+		    var Camera_X_Position = mathRandomInt(0, Level_Size);
+		    var Camera_Y_Position = mathRandomInt(0, Level_Size);
+		    var Camera_Zoom = 1;
+		    timeSecX = 0;
+		    var me_list = null;
+		    RespawnPlayer()
+		    var Collects = [];
+		    var VirusR = [];
+		    for (var count = 0; count < Collects_Max; count++){
+		        AddCollects(mathRandomInt(5, 25),mathRandomInt(0, Level_Size),mathRandomInt(0, Level_Size),colourRandom())
+		    }
+		    for (var count = 0; count < VirusR_Max; count++){
+		        AddVirus(mathRandomInt(0, Level_Size),mathRandomInt(0, Level_Size),mathRandomInt(1, 2))
+		    }
+		    var canvas = document.getElementById("Stage");
+		    
+		    function resize() {
+		        canvas.width = window.innerWidth;
+		        canvas.height = window.innerHeight;
+		    }
+		    resize();
+		    window.addEventListener("resize", resize);
+		    var ctx = canvas.getContext("2d");
+		    function startGame() {
+		        setInterval(updateGame, 40);
+		    }
+		    function updateGame(){
+		        ctx.clearRect(0, 0, canvas.width, canvas.height);
+		        if ((me_list.length / 7) > 0) {
+		            if (KeyPressH == "Space") {
+		                splitKey += 1;
+		            } else {
+		                if (KeyPressH == "w") {
+		                    splitKey = -1;
+		                } else {
+		                    splitKey = 0;
+		                }
+		            }
+		            Me_Move(((Mouse_X_Position / 0.3) + Camera_X_Position),((Mouse_Y_Position / 0.3) + Camera_Y_Position));
+		            Set_Zoom();
+		            Camera_X_Position = MyPlayerX;
+		            Camera_Y_Position = MyPlayerY;	
+		        }
+		        Draw_Grid(((Camera_X_Position / Camera_Zoom) - (canvas.width / 2)),((Camera_Y_Position / Camera_Zoom) + (canvas.height / 2)),(60 / Camera_Zoom));
+		        Draw_Me();
+		        Draw_Collects();
+		        Draw_Virus();
+		    
+		        if (!(me_list.length > 0) && KeyPressH == "Space") {
+		            RespawnPlayer()
+		        }
+
+		        if (!(me_list.length > 0)) {
+		            Camera_X_Position += Mouse_X_Position / 17;
+		            Camera_Y_Position += Mouse_Y_Position / 17;
+		            Camera_Zoom += ((3.6 - Camera_Zoom) / 5);
+		        }
+
+		        document.getElementById('demo').innerHTML = "Score: " + Scores + " High: " + HighScores;
+		        timeSecX += 1;
+		        if (timeSecX > 10) {
+		            GetC_V_From();
+		            timeSecX = 0;
+		        }
+		        TimerH += 0.03;
+		    }
+		    
+		    function Draw_Me(){
+		        mi = 1;
+		        for (var count = 0; count < (me_list.length / 7); count++) {
+		            siz = (me_list[(mi - 1)] * 2);
+		            if (siz < 6) {
+		                me_list.splice((mi -1), 7);
+		            } else {
+		                Draw_Circle(((me_list[mi] - Camera_X_Position) / Camera_Zoom),((me_list[(mi + 1)] - Camera_Y_Position) / Camera_Zoom),(siz / Camera_Zoom),"#4c76d8");
+		                Draw_Circle(((me_list[mi] - Camera_X_Position) / Camera_Zoom),((me_list[(mi + 1)] - Camera_Y_Position) / Camera_Zoom),((siz - 10) / Camera_Zoom),"#5889ff");
+		                Draw_Text(((me_list[mi] - Camera_X_Position) / Camera_Zoom),((me_list[(mi + 1)] - Camera_Y_Position) / Camera_Zoom),MyPlayerUsername,((siz / (MyPlayerUsername.length / 1.8)) / Camera_Zoom))
+		                mi += 7;
+		            }
+		            
+		        }
+		    }
+		    function Draw_Virus() {
+		        i = 1;
+		        repeat_end = (VirusR.length / 6);
+		        for (var count = 0; count < repeat_end; count++){
+		            siz = (VirusR[(i - 1)] / Camera_Zoom)
+		            if (siz < 6) {
+		                VirusR.splice((i -1), 6);
+		            } else {
+		                dx = ((VirusR[i] - Camera_X_Position) / Camera_Zoom)
+		                dy = ((VirusR[(i + 1)] - Camera_Y_Position) / Camera_Zoom)
+		                if (VirusR[(i + 4)] == 2) {
+		                    colorJF = "#ff8888";
+		                } else {
+		                    colorJF = "#25fb09";
+		                }
+		                Draw_Circle(dx,dy,siz,colorJF);
+		                dx = VirusR[i]
+		                dy = VirusR[(i + 1)]
+		                siz= VirusR[(i - 1)]
+		                if (VirusR[(i + 4)] == 2) {
+		                    if (siz > 80) {
+		                        for (var count4 = 0; count4 < 3; count4++){
+		                            pdir = mathRandomInt(-180.1, 180.1,true);
+		                            radius_J = (siz /2);
+		                            Collects.push(mathRandomInt(6, 12),(dx + (Math.sin(pdir / 180 * Math.PI) * radius_J)),(dy + (Math.cos(pdir / 180 * Math.PI) * radius_J)),(Math.sin(pdir / 180 * Math.PI) * 2),(Math.cos(pdir / 180 * Math.PI) * 2),colourRandom());
+		                            VirusR[(i - 1)] = (VirusR[(i - 1)] - (0.6 / (((VirusR[(i - 1)] - 80) / 160) + 1)))
+		                        }
+		                    }
+		                }
+		                mi = 1;
+		                repeat_end2 = (me_list.length / 7);
+		                for (var count2 = 0; count2 < repeat_end2; count2++){
+		                    if ((me_list[(mi - 1)] * 2) > siz) {
+		                        collectV((dx - me_list[mi]),(dy - me_list[(mi + 1)]),me_list[(mi - 1)]);
+		                    }
+		                    if (VirusR[(i + 4)] == 2) {
+		                        if ((me_list[(mi - 1)] * 2) < siz) {
+		                            collectM((dx - me_list[mi]),(dy - me_list[(mi + 1)]),siz);
+		                        }
+		                    }
+		                    mi += 7;
+		                }
+		                i += 6;
+		            }
+		        }
+		    }
+		    function collectV(jx,jy,js) {
+		        if ((jx * jx) + (jy * jy) < ((js * js) * 1)) {
+		            distG = (me_list.length / 7);
+		            if (distG < 16) {
+		                distG = (16 - distG);
+		                siz = Math.sqrt((((js * js) / distG) * 1));
+		                for (var count3 = 0; count3 < distG; count3++){
+		                    me_list.push(siz,me_list[mi],me_list[(mi + 1)],mathRandomInt(-55.5, 55.5),mathRandomInt(-55.5, 55.5),(TimerH + 15),0);
+		                }
+		                me_list[(mi - 1)] = siz;
+		                me_list[(mi + 4)] = (TimerH + 15);
+		            }
+		            me_list[(mi - 1)] = (me_list[(mi - 1)] + (js / 8));
+		            VirusR[(i - 1)] = -1;
+		        }
+		    }
+		    function collectM(jx,jy,js) {
+		        if ((jx * jx) + (jy * jy) < ((js * js) * 0.25)) {
+		            VirusR[(i - 1)] = Math.sqrt((js * js) + ((me_list[(mi - 1)] * me_list[(mi - 1)]) * 10));
+		            me_list[(mi - 1)] = -1;
+		        }
+		    }
+		    function Set_Zoom() {
+		        xp = me_list[1];
+		        yp = me_list[2];
+		        dx = xp;
+		        dy = yp;
+		        siz = me_list[0];
+		        Scores = 0;
+		        i = 1;
+		        repeat_end = (me_list.length / 7);
+		        for (var count = 0; count < repeat_end; count++) {
+		            MaxBounds(me_list[i], me_list[(i + 1)]);
+		            Scores += me_list[(i - 1)];
+		            if (me_list[(i - 1)] > siz) {
+		                siz = me_list[(i - 1)];
+		            }
+		            //siz += me_list[(i - 1)];
+		            i += 7;
+		        }
+		        Scores = Math.floor(Scores);
+		        if (Scores > HighScores) {
+		            HighScores = Scores;
+		        }
+		        xp = ((xp + dx) / 2);
+		        yp = ((yp + dy) / 2);
+		        Camera_Zoom += ((((siz / 500) + 0.8) - Camera_Zoom) / 7);
+		        MyPlayerX = xp;
+		        MyPlayerY = yp;
+		    }
+		    function Me_Move(mwx,mwy) {
+		        mi = 1;
+		        repeat_end = (me_list.length / 7);
+		        for (var count = 0; count < repeat_end; count++) {
+		            siz = me_list[(mi -1)];
+		            xd = me_list[mi];
+		            yd = me_list[(mi + 1)];
+		            sx = me_list[(mi + 2)];
+		            sy = me_list[(mi + 3)];
+		            Me_MoveOne((mwx - xd),(mwy - yd));
+		            me_list[(mi -1)] = siz;
+		            me_list[mi] = xd;
+		            me_list[(mi +1)] = yd;
+		            me_list[(mi +2)] = sx;
+		            me_list[(mi +3)] = sy;
+		            mi += 7;
+		        }
+		    }
+		    function Me_MoveOne(mvx,mvy){
+		        i = Math.sqrt(((mvx * mvx) + (mvy * mvy)));
+		        if (i < 80) {
+		            i = 80;
+		        }
+		        speed = (150000 / ((siz + 90) * (siz + 90)))
+		        if (speed < 3) {
+		            speed = 3;
+		        }
+		        sx = ((((mvx / i) * speed) + (sx * 4)) / 5);
+		        sy = ((((mvy / i) * speed) + (sy * 4)) / 5);
+		        if (true) {
+		            xd += sx;
+		            yd += sy;
+		            siz = (siz * 0.9999);
+		            if (siz < 10) {
+		                if (siz > 6) {
+		                    siz = 10;
+		                }
+		            }
+		        }
+		        if (Level_Size_Collision == true) {
+		            if (xd<0) {
+		                xd += ((0 - xd) / 3);
+		            }
+		            if (yd<0) {
+		                yd += ((0 - yd) / 3);
+		            }
+		            if (xd>Level_Size) {
+		                xd += ((Level_Size - xd) / 3);;
+		            }
+		            if (yd>Level_Size) {
+		                yd += ((Level_Size - yd) / 3);
+		            }	
+		            if (siz > (Level_Size / 3)) {
+		                siz = (Level_Size / 3);
+		            }
+		        }
+		        isMaxSizeH = false;
+		        if (Level_Size_Collision == true) {
+		            if (siz > (Level_Size / 3)) {
+		                isMaxSizeH = true;
+		            }
+		        }
+		        Me_Bump(mi);
+		        if (siz > 20) {
+		            if (splitKey == 1 || isMaxSizeH == true) {
+		                z_dir((xd - ((Mouse_X_Position * Camera_Zoom) + Camera_X_Position)),(yd - ((Mouse_Y_Position * Camera_Zoom) + Camera_Y_Position)));
+		                split((Math.sin(pdir / 180 * Math.PI) * 50),(Math.cos(pdir / 180 * Math.PI) * 50));
+		                isMaxSizeH = false;
+		            } else {
+		                if (splitKey == -1) {
+		                    z_dir((xd - ((Mouse_X_Position * Camera_Zoom) + Camera_X_Position)),(yd - ((Mouse_Y_Position * Camera_Zoom) + Camera_Y_Position)));
+		                    Collects.push(40,(xd + (Math.sin(pdir / 180 * Math.PI) * (siz * 1))),(yd + (Math.cos(pdir / 180 * Math.PI) * (siz * 1))),(Math.sin(pdir / 180 * Math.PI) * 40),(Math.cos(pdir / 180 * Math.PI) * 40),colourRandom());
+		                    siz += -1;
+		                }
+		            }
+		        }
+		    }
+		    function MaxBounds(xd,yd){
+		        if (xd<xp) {
+		            xp = xd;
+		        } else {
+		            if (xd>dx) {
+		                dx = xd;
+		            }
+		        }
+		        if (yd<yp) {
+		            yp = yd;
+		        } else {
+		            if (yd>dy) {
+		                dy = yd;
+		            }
+		        }
+		    }
+		    function split(xn,yn){
+		        if ((me_list.length / 7) < 16) {
+		            split2(xn,yn,Math.sqrt(((siz * siz) / 2)),(TimerH + 15))
+		        }
+		    }
+		    function split2(hfx, hfy, mass, mergeTime) {
+		        siz = Math.sqrt(((siz * siz) - (mass * mass)))
+		        me_list.push(mass)
+		        me_list.push((xd + (hfx * 2)));
+		        me_list.push((yd + (hfy * 2)));
+		        me_list.push(hfx);
+		        me_list.push(hfy);
+		        me_list.push(mergeTime);
+		        me_list.push(0);
+		        me_list[(mi + 4)] = mergeTime;
+		    }
+		    function Me_Bump(mi_1) {
+		        mi = 1;
+		        for (var count3 = 0; count3 < (me_list.length / 7); count3++){
+		            if (!(mi_1 == mi)) {
+		                Me_BumpThis((xd - me_list[mi]),(yd - me_list[(mi + 1)]),((siz + me_list[(mi - 1)]) *1));
+		                mi += 7;
+		            }
+		        }
+		    }
+		    function Me_BumpThis(xh,yh,spil) {
+		        dx = Math.sqrt(((xh * xh) + (yh * yh)));
+		        if (dx < spil) {
+		            if (me_list[(mi + 4)] > TimerH) {
+		                if (dx == 0) {
+		                    sx += mathRandomInt(-5.5, 5.5);
+		                    sy += mathRandomInt(-5.5, 5.5);
+		                } else {
+		                    dx = ((spil - dx) * ((spil - siz) / spil));
+		                    sx += ((xh / spil) * (dx / 3));
+		                    sy += ((yh / spil) * (dx / 3));
+		                }
+		            } else {
+		                if (dx < (spil / 3)) {
+		                    siz = Math.sqrt(((siz * siz) + (me_list[(mi - 1)] * me_list[(mi - 1)])));
+		                    me_list[(mi - 1)] = -1;
+		                }
+		            }
+		        }
+		    }
+		    function Draw_Collects(){
+		        i = 1;
+		        for (var count = 0; count < (Collects.length / 6); count++) {
+		            siz = Collects[(i - 1)];
+		            if (siz<6) {
+		                Collects.splice((i -1), 6);
+		            } else {
+		                Draw_Circle(((Collects[i] - Camera_X_Position) / Camera_Zoom),((Collects[(i + 1)] - Camera_Y_Position) / Camera_Zoom),(siz / Camera_Zoom),Collects[(i + 4)]);
+		                Collects[(i + 2)] = (Collects[(i + 2)] * 0.9)
+		                Collects[(i + 3)] = (Collects[(i + 3)] * 0.9)
+		                Collects[i] += Collects[(i + 2)];
+		                Collects[(i + 1)] += Collects[(i + 3)];
+		                if (Level_Size_Collision == true) {
+		                    if (Collects[i] < 0) {
+		                        Collects[i] = 0;
+		                        Collects[(i + 2)] = 0
+		                    }
+		                    if (Collects[(i + 1)] < 0) {
+		                        Collects[(i + 1)] = 0;
+		                        Collects[(i + 3)] = 0;
+		                    }
+		                    if (Collects[i] > Level_Size) {
+		                        Collects[i] = Level_Size;
+		                        Collects[(i + 2)] = 0
+		                    }
+		                    if (Collects[(i + 1)] > Level_Size) {
+		                        Collects[(i + 1)] = Level_Size;
+		                        Collects[(i + 3)] = Level_Size;
+		                    }
+		                }
+		                dx = Collects[i];
+		                dy = Collects[(i + 1)];
+		                mi = 1;
+		                for (var count2 = 0; count2 < (me_list.length / 7); count2++){
+		                    if ((me_list[(mi -1)] / 0.5) > Collects[(i - 1)]) {
+		                        collectC((dx - me_list[mi]),(dy - me_list[(mi + 1)]),me_list[(mi - 1)]);
+		                    }
+		                    mi += 7;
+		                }
+		                i += 6;
+		            }
+		        }
+		    }
+		    function collectC(jx,jy,js) {
+		        if ((jx * jx) + (jy * jy) < ((js * js) * 1)) {
+		            if (false) {
+		                me_list[(mi - 1)] += (Collects[(i - 1)] / 28);
+		            } else {
+		                me_list[(mi - 1)] = (Math.sqrt((js * js) + (Collects[(i - 1)] * 6)));
+		            }
+		            Collects[(i - 1)] = -1;
+		        }
+		    }
+		    function GetC_V_From() {
+		        if ((Collects.length / 6) < Collects_Max) {
+		            for (var count3 = 0; count3 < 500; count3++){
+		                AddCollects(mathRandomInt(10, 25),mathRandomInt(0, Level_Size),mathRandomInt(0, Level_Size),colourRandom())
+		                if ((Collects.length / 6) > Collects_Max) {
+		                    break;
+		                }
+		            }
+		        }
+		        if ((VirusR.length / 6) < VirusR_Max) {
+		            for (var count3 = 0; count3 < 500; count3++){
+		                AddVirus(mathRandomInt(0, Level_Size),mathRandomInt(0, Level_Size),mathRandomInt(1, 2))
+		                if ((VirusR.length / 6) > VirusR_Max) {
+		                    break;
+		                }
+		            }
+		        }
+		    }
+		    function RespawnPlayer() {
+		        me_list = [20,mathRandomInt(0, Level_Size),mathRandomInt(0, Level_Size),0,0,0,0];
+		    }
+		    function AddVirus(xT,yT,typT) {
+		        if (typT == 2) {
+		            siz = 80;
+		        } else {
+		            siz = 60;
+		        }
+		        VirusR.push(siz,xT,yT,0,0,typT);
+		    }
+		    function AddCollects(sT,xT,yT,color) {
+		        Collects.push(sT,xT,yT,0,0,color);
+		    }
+		    function Draw_Circle(xd,yd,radius_H,colorsH){
+		        if ((xd + radius_H) > ((canvas.width / 2) * -1) && (xd - radius_H) < ((canvas.width / 2) * 1)) {
+		            if ((yd + radius_H) > ((canvas.height / 2) * -1) && (yd - radius_H) < (canvas.height / 2)) {
+		                ctx.beginPath();
+		                ctx.fillStyle = colorsH;
+		                ctx.arc((xd + (canvas.width / 2)), ((yd * -1) + (canvas.height / 2)), (radius_H / 2), 0, 2 * Math.PI);
+		                ctx.fill();
+		            }
+		            
+		        }
+		    }
+		    function Draw_Text(xd,yd,text,sizeT) {
+		        ctx.font = sizeT + "px Comic Sans MS";
+		        ctx.fillStyle = "#fff";
+		        ctx.textAlign = "center";
+		        ctx.fillText(text, (xd + (canvas.width / 2)), (((yd - (sizeT /  4)) * -1) + (canvas.height / 2)));
+		    }
+		    function Draw_Grid(gx,gy,sizeT) {
+		        if (true) {
+		            POSJX = ((((canvas.width / 2) * -1) - (gx % sizeT)));
+		            while (!(POSJX > (canvas.width / 2))) {
+		                Draw_LinesJ(POSJX,((canvas.height / 2) * -1),POSJX,(canvas.height / 2),"#666",1)
+		                POSJX += sizeT;
+		            }
+		            POSJX = ((((canvas.height / 2) * 1) - (gy % sizeT)));
+		            while (!(POSJX < ((canvas.width / 2) * -1))) {
+		                Draw_LinesJ((canvas.width / 2),POSJX,((canvas.width / 2) * -1),POSJX,"#666",1)
+		                POSJX -= sizeT;
+		            }	
+		        }
+		    }
+		    function Draw_LinesJ(hndx,hndy,hndx2,hndy2,color,lineWidthH){
+		        ctx.beginPath();
+		        ctx.lineWidth = "2";
+		        ctx.strokeStyle = color;
+		        ctx.moveTo((hndx + (canvas.width / 2)), ((hndy * -1) + (canvas.height / 2)));
+		        ctx.lineTo((hndx2 + (canvas.width / 2)), ((hndy2 * -1) + (canvas.height / 2)));
+		        ctx.stroke();
+		    }
+		    function z_dir(HFDX,HFDY) {
+		        pdir = Math.atan(HFDX / HFDY) / Math.PI * 180;
+		        if (HFDY > 0) {
+		            pdir += -180;
+		        }
+		    }
+		    function mathRandomInt(a, b, isCon) {
+		        if (a > b) {
+		            var c = a;
+		            a = b;
+		            b = c;
+		        }
+		        if (isCon == true) {
+		            return (Math.random() * (b - a + 1) + a);
+		        } else {
+		            return Math.floor(Math.random() * (b - a + 1) + a);
+		        }
+		    }
+		    function colourRandom() {
+		        var num = Math.floor(Math.random() * Math.pow(2, 24));
+		        return '#' + ('00000' + num.toString(16)).substr(-6);
+		    }
+		    function cnvs_getCoordinates(e) {
+		        Mouse_X_Position = (e.clientX - (canvas.width / 2));
+		        Mouse_Y_Position = ((e.clientY * -1) + (canvas.height / 2));
+		    }
+		    document.addEventListener('keydown',function(evento){if(evento.keyCode == 32){
+		        posFixedKeySpace();
+		    }})
+		    document.addEventListener('keydown',function(evento){if(evento.keyCode == 87){
+		        KeyPressH = "w";
+		    }})
+		    document.addEventListener('keyup',function(evento){
+		        clearFixedKeyPressH();
+		    })
+		    function posFixedKeySpace(){
+		        KeyPressH = "Space";
+		    }
+		    function clearFixedKeyPressH() {
+		        KeyPressH = null;
+		    }
+		    return {
+		        cnvs_getCoordinates,
+		        RespawnPlayer,
+		        startGame
+		    }
+		}());
+		</script>
+	</body>
+</html>

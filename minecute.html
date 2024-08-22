@@ -1,0 +1,704 @@
+<html>
+	<head>
+		<title>HDFGDG</title>
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+				color: #fff;
+				font-family: monospace;
+			}
+			#game {
+				margin: 0;
+			}
+			#game canvas {
+				background: rgb(0, 0, 0);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="game"></div>
+		<div style="position: absolute; top: 5px; left: 5px; background-color: rgba(0, 0, 0, 0.5); padding: 10px;">
+			<div id="fps0">FPS: 60</div>
+		</div>
+		<script>
+			class RenderCanvas2d {
+				constructor() {
+					this.canvas = document.createElement("canvas");
+					this.ctx = this.canvas.getContext("2d");
+				}
+				resize(w, h) {
+					this.canvas.width = w;
+					this.canvas.height = h;
+				}
+				clear() {
+					this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+				}
+				drawLine(x1, y1, x2, y2, width, u_color) {
+					var ctx = this.ctx;
+					ctx.lineWidth = width * 2;
+					ctx.strokeStyle = "rgba(" + (u_color[0] * 255) + ',' + (u_color[1] * 255) + ',' + (u_color[2] * 255) + ',' + u_color[3] + ')';
+					ctx.beginPath();
+					ctx.moveTo(x1, y1);
+					ctx.lineTo(x2, y2);
+					ctx.stroke();
+				}
+			    flush() {}
+			}
+
+			const vs2 = `
+precision mediump float;
+
+uniform mat3 view_matrix;
+
+attribute vec2 position;
+attribute vec4 color;
+
+varying vec4 frag_color;
+
+void main() {
+    frag_color = vec4(color.xyz, color.w);
+
+	gl_Position = vec4((view_matrix * vec3(position, 1)).xy, 0.0, 1.0);
+}`;
+			const fs2 = `
+precision mediump float;
+
+varying vec4 frag_color;
+
+void main() {
+   gl_FragColor = frag_color;
+}`;
+
+			function projection(width, height) {
+			    return [
+			        2 / width, 0, 0,
+			        0, -2 / height, 0,
+			        -1, 1, 1,
+			    ];
+			}
+
+			class Shader {
+			    constructor(gl, program) {
+			        this.gl = gl;
+			        this.program = program;
+			        this.uniformLocations = {};
+			        this.attributeLocations = {};
+			        const activeUniforms = gl.getProgramParameter(program, this.gl.ACTIVE_UNIFORMS);
+			        for (let index = 0; index < activeUniforms; index++) {
+			            const info = gl.getActiveUniform(program, index);
+			            if (!info) {
+			                throw new Error('uniform at index ' + index + ' does not exist');
+			            }
+			            const name = info.name;
+			            const location = gl.getUniformLocation(program, name);
+			            if (!location) {
+			                throw new Error('uniform named ' + name + ' does not exist');
+			            }
+			            this.uniformLocations[name] = location;
+			        }
+			        const activeAttributes = gl.getProgramParameter(program, this.gl.ACTIVE_ATTRIBUTES);
+			        for (let index = 0; index < activeAttributes; index++) {
+			            const info = gl.getActiveAttrib(program, index);
+			            if (!info) {
+			                throw new Error('attribute at index ' + index + ' does not exist');
+			            }
+			            this.attributeLocations[info.name] = gl.getAttribLocation(program, info.name);
+			        }
+			    }
+			    uniform1f(name, value) {
+			        const location = this.getUniform(name);
+			        this.gl.uniform1f(location, value);
+			    }
+			    uniform2f(name, a, b) {
+			        const location = this.getUniform(name);
+			        this.gl.uniform2f(location, a, b);
+			    }
+			    uniform3f(name, a, b, c) {
+			        const location = this.getUniform(name);
+			        this.gl.uniform3f(location, a, b, c);
+			    }
+			    uniform4f(name, a, b, c, d) {
+			        const location = this.getUniform(name);
+			        this.gl.uniform4f(location, a, b, c, d);
+			    }
+			    uniformMatrix3(name, value) {
+			        const location = this.getUniform(name);
+			        this.gl.uniformMatrix3fv(location, false, value);
+			    }
+			    hasUniform(name) {
+			        return this.uniformLocations.hasOwnProperty(name);
+			    }
+			    getUniform(name) {
+			        if (!this.hasUniform(name)) {
+			            throw new Error('uniform of name ' + name + ' does not exist');
+			        }
+			        return this.uniformLocations[name];
+			    }
+			    attributeBuffer(name, value) {
+			        if (!this.hasAttribute(name)) {
+			            throw new Error('attribute of name ' + name + ' does not exist');
+			        }
+			        const location = this.attributeLocations[name];
+			        this.gl.enableVertexAttribArray(location);
+			        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, value);
+			        this.gl.vertexAttribPointer(location, 2, this.gl.FLOAT, false, 0, 0);
+			    }
+			    hasAttribute(name) {
+			        return this.attributeLocations.hasOwnProperty(name);
+			    }
+			    getAttribute(name) {
+			        if (!this.hasAttribute(name)) {
+			            throw new Error('attribute of name ' + name + ' does not exist');
+			        }
+			        return this.attributeLocations[name];
+			    }
+			}
+
+			class RenderWebGL {
+				constructor() {
+			        const canvas = document.createElement('canvas');
+			        canvas.width = 360;
+			        canvas.height = 360;
+			        const gl = canvas.getContext('webgl', {
+			            alpha: true,
+			            antialias: true,
+			            depth: false,
+			            failIfMajorPerformanceCaveat: true,
+			            premultipliedAlpha: true,
+			            preserveDrawingBuffer: true
+			        });
+			        
+			        this.canvas = canvas;
+			        this.gl = gl;
+
+			        this.shaderColorLine = this.createShader(vs2, fs2);
+			        
+			        gl.enable(gl.BLEND);
+			        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+			        this.penLines = new Float32Array(32768);
+			        this.penLinesIndex = 0;
+
+			        this.penColors = new Float32Array(65536);
+			        this.penColorsIndex = 0;
+
+			        this.lineBuffer = gl.createBuffer();
+			        this.colorBuffer = gl.createBuffer();
+				}
+			    createShader(vs, fs, definitions) {
+			        const program = this.compileProgram(vs, fs, definitions);
+			        return new Shader(this.gl, program);
+			    }
+			    compileProgram(vs, fs, definitions) {
+			        const vertexShader = this.compileShader(this.gl.VERTEX_SHADER, vs, definitions);
+			        const fragmentShader = this.compileShader(this.gl.FRAGMENT_SHADER, fs, definitions);
+			        const program = this.gl.createProgram();
+			        if (!program) {
+			            throw new Error('Cannot create program');
+			        }
+			        this.gl.attachShader(program, vertexShader);
+			        this.gl.attachShader(program, fragmentShader);
+			        this.gl.linkProgram(program);
+			        if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
+			            const error = this.gl.getProgramInfoLog(program);
+			            this.gl.deleteProgram(program);
+			            throw new Error('Program compilation error: ' + error);
+			        }
+			        return program;
+			    }
+			    compileShader(type, source, definitions) {
+			        if (definitions) {
+			            for (const def of definitions) {
+			                source = '#define ' + def + '\n' + source;
+			            }
+			        }
+			        const shader = this.gl.createShader(type);
+			        if (!shader) {
+			            throw new Error('Cannot create shader');
+			        }
+			        this.gl.shaderSource(shader, source);
+			        this.gl.compileShader(shader);
+			        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+			            const error = this.gl.getShaderInfoLog(shader);
+			            this.gl.deleteShader(shader);
+			            throw new Error('Shader compilation error: ' + error);
+			        }
+			        return shader;
+			    }
+			    useShader(shader) {
+			        if (this.currentShader !== shader) {
+			            this.gl.useProgram(shader.program);
+			            this.currentShader = shader;
+			        }
+			    }
+				resize(w, h) {
+					this.canvas.width = w;
+					this.canvas.height = h;
+			        this.clear();
+				}
+				clear() {
+			        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+			        this.gl.clearColor(0, 0, 0, 0);
+			        this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+				}
+			    buffersCanFit(size) {
+			        return (this.penLinesIndex + size) > (this.penLines.length / 2);
+			    }
+			    drawPendingOperations() {
+			        this.useShader(this.shaderColorLine);
+			        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.lineBuffer);
+			        this.gl.bufferData(this.gl.ARRAY_BUFFER, this.penLines, this.gl.STREAM_DRAW);
+			        this.gl.vertexAttribPointer(this.currentShader.getAttribute("position"), 2, this.gl.FLOAT, false, 0, 0);
+			        this.gl.enableVertexAttribArray(this.currentShader.getAttribute("position"));
+			        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.colorBuffer);
+			        this.gl.bufferData(this.gl.ARRAY_BUFFER, this.penColors, this.gl.STREAM_DRAW);
+			        this.gl.vertexAttribPointer(this.currentShader.getAttribute("color"), 4, this.gl.FLOAT, false, 0, 0);
+			        this.gl.enableVertexAttribArray(this.currentShader.getAttribute("color"));
+			        var matrix = projection(this.canvas.width, this.canvas.height);
+			        this.currentShader.uniformMatrix3("view_matrix", matrix);
+			        this.gl.drawArrays(this.gl.TRIANGLES, 0, (this.penLinesIndex / 2));
+			        this.penLinesIndex = 0;
+			        this.penColorsIndex = 0;
+			    }
+				drawLine(x1, y1, x2, y2, width, u_color) {
+			        var siz = width;
+			        var zdir = Math.atan((x2 - x1) / (y2 - y1)) * 180 / Math.PI;
+			        if ((y2 - y1) < 0) {
+			            zdir += 180;
+			        }
+			        zdir += 90;
+			        var sine = (Math.sin(zdir * (Math.PI / 180)));
+			        var cosine = (Math.cos(zdir * (Math.PI / 180)));
+			        var x1a = x1 + (sine * siz);
+			        var y1a = y1 + (cosine * siz);
+			        var x1b = x1 + (sine * (siz * -1));
+			        var y1b = y1 + (cosine * (siz * -1));
+			        var x2a = x2 + (sine * siz);
+			        var y2a = y2 + (cosine * siz);
+			        var x2b = x2 + (sine * (siz * -1));
+			        var y2b = y2 + (cosine * (siz * -1));
+
+			        if (this.buffersCanFit(siz)) {
+			            this.drawPendingOperations();
+			        }
+
+			        this.penLines[this.penLinesIndex++] = x1a;
+			        this.penLines[this.penLinesIndex++] = y1a;
+			        this.penLines[this.penLinesIndex++] = x1b;
+			        this.penLines[this.penLinesIndex++] = y1b;
+			        this.penLines[this.penLinesIndex++] = x2a;
+			        this.penLines[this.penLinesIndex++] = y2a;
+			        this.penLines[this.penLinesIndex++] = x2a;
+			        this.penLines[this.penLinesIndex++] = y2a;
+			        this.penLines[this.penLinesIndex++] = x2b;
+			        this.penLines[this.penLinesIndex++] = y2b;
+			        this.penLines[this.penLinesIndex++] = x1b;
+			        this.penLines[this.penLinesIndex++] = y1b;
+			        for (let i = 0; i < 6; i++) {
+			            this.penColors[this.penColorsIndex++] = u_color[0];
+			            this.penColors[this.penColorsIndex++] = u_color[1];
+			            this.penColors[this.penColorsIndex++] = u_color[2];
+			            this.penColors[this.penColorsIndex++] = u_color[3];
+			        }
+				}
+				flush() {
+			        if (this.penLinesIndex > 0) {
+			            this.drawPendingOperations();
+			        }
+			        this.gl.flush();
+				}
+			}
+
+			class Player {
+				constructor() {
+					this.x = 0;
+					this.y = 0;
+					this.z = 0;
+					this.height = 0.5;
+				}
+				setX(value) {
+					this.x = value;
+				}
+				setY(value) {
+					this.y = value;
+				}
+				setZ(value) {
+					this.z = value;
+				}
+			}
+
+			const ColorMap = [
+				[1, 0, 0],
+				[1, 1, 0],
+				[0, 1, 0],
+				[0, 1, 1],
+				[0, 0, 1],
+				[1, 0, 1],
+			];
+
+			const mod = function(x, y) {
+			    var r = x % y;
+			    if (r / y < 0) {
+			      r += y;
+			    }
+			    return r;
+			  };
+
+			class Game {
+				constructor() {
+					//this.renderer = new RenderCanvas2d();
+					this.renderer = new RenderWebGL();
+					this.canvas = this.renderer.canvas;
+					this.canvas.tabIndex = 0;
+			        this.canvas.style.outline = 'none';
+					this.width = 0;
+					this.height = 0;
+					this.moveX = 0;
+					this.moveZ = 0;
+					this.moveY = 0;
+					this.playerSpeed = 0.015;
+					this.verX = 0;
+					this.verY = 0;
+					this.verZ = 0;
+					this.MaxDrawDistance = 24;
+					this.camera = {
+						position: {x: 0, z: 5, y: 2},
+						rotation: {x: 0, y: 0},
+						distance: {sinX: 0, cosX:0, sinY: 0, cosY: 0},
+						FOV: 270
+					};
+					this.player = new Player();
+					this.player.setX(1.5);
+					this.player.setZ(1.5);
+					this.player.setY(1.5);
+					this.terrain = {
+						width: 0,
+						height: 0,
+						depth: 0,
+						terrainData: null
+					};
+					this.lineWidth = 1;
+					this.u_color = [0, 0, 0, 1];
+
+					this.timeTick = 0;
+
+					this.setWH(480, 360);
+					this.init();
+				}
+				resetPlayer() {
+					this.player.setX(1.5);
+					this.player.setZ(1.5);
+					this.player.setY(1.5);
+					this.verX = 0;
+					this.verY = 0;
+					this.verZ = 0;
+				}
+				setWH(width, height) {
+					this.width = width;
+					this.height = height;
+					this.renderer.resize(width, height);
+				}
+				init() {
+					this.terrain.width = 64;
+					this.terrain.depth = 64;
+					this.terrain.height = 64;
+					this.terrain.terrainData = new Array(this.terrain.height * (this.terrain.width * this.terrain.depth));
+					this.initTerrain();
+				}
+				initTerrain() {
+					var terrain = this.terrain;
+					var terrainData = this.terrain.terrainData;
+					for (var w = 0; w < terrain.width; w++) {
+						for (var d = 0; d < terrain.depth; d++) {
+							terrainData[0 + (terrain.height * (w + (this.terrain.depth * d)))] = 0;
+						}
+					}
+					for (let k = 0; k < 64; k++) {
+						for (let l = 0; l < 64; l++) {
+							terrainData[(1 + l) + (terrain.height * (0 + (this.terrain.depth * (0 + k))))] = 0;
+							terrainData[(1 + l) + (terrain.height * (k + (this.terrain.depth * (0 + 0))))] = 0;
+						}
+					}
+					for (var d1 = 0; d1 < 60000; d1++) {
+						var w = Math.floor(Math.random() * 256);
+						var h = Math.floor(Math.random() * 256);
+						var d = Math.floor(Math.random() * 256);
+						terrainData[w + (terrain.height * (h + (this.terrain.depth * d)))] = 1;
+					}
+				}
+				drawLine(x1, y1, x2, y2) {
+					this.renderer.drawLine(x1 + (this.width / 2), (-y1) + (this.height / 2), x2 + (this.width / 2), (-y2) + (this.height / 2), this.lineWidth, this.u_color);
+				}
+				cameraDistance() {
+					this.camera.distance.sinX = Math.sin(this.camera.rotation.x * Math.PI / 180);
+					this.camera.distance.cosX = Math.cos(this.camera.rotation.x * Math.PI / 180);
+					this.camera.distance.sinY = Math.sin(this.camera.rotation.y * Math.PI / 180);
+					this.camera.distance.cosY = Math.cos(this.camera.rotation.y * Math.PI / 180);
+				}
+				setPoint1(p, x, y, z) {
+					p.x1 = x;
+					p.y1 = y;
+					p.z1 = z;
+				}
+				setPoint2(p, x, y, z) {
+					p.x2 = x;
+					p.y2 = y;
+					p.z2 = z;
+				}
+				drawLine3d(x1, y1, z1, x2, y2, z2) {
+					var p = {x1: 0, y1: 0, z1: 0, x2: 0, y2: 0, z2: 0};
+					p.x1 = (x1 - this.camera.position.x);
+					p.y1 = (y1 - this.camera.position.y);
+					p.z1 = (z1 - this.camera.position.z);
+					p.x2 = (x2 - this.camera.position.x);
+					p.y2 = (y2 - this.camera.position.y);
+					p.z2 = (z2 - this.camera.position.z);
+					this.setPoint1(p, ((p.z1 * this.camera.distance.sinX) + (p.x1 * this.camera.distance.cosX)), p.y1, ((p.z1 * this.camera.distance.cosX) - (p.x1 * this.camera.distance.sinX)));
+					this.setPoint2(p, ((p.z2 * this.camera.distance.sinX) + (p.x2 * this.camera.distance.cosX)), p.y2, ((p.z2 * this.camera.distance.cosX) - (p.x2 * this.camera.distance.sinX)));
+					this.setPoint1(p, p.x1, ((p.y1 * this.camera.distance.cosY) + (p.z1 * this.camera.distance.sinY)), ((p.y1 * this.camera.distance.sinY) - (p.z1 * this.camera.distance.cosY)));
+					this.setPoint2(p, p.x2, ((p.y2 * this.camera.distance.cosY) + (p.z2 * this.camera.distance.sinY)), ((p.y2 * this.camera.distance.sinY) - (p.z2 * this.camera.distance.cosY)));
+					if (!(p.z1 < 0.1 && p.z2 < 0.1)) {
+						if ((p.z1 < 0.1 || p.z2 < 0.1)) {
+							var s = (0.1 - p.z1) / (p.z2 - p.z1);
+							if (p.z1 < 0.1) {
+								p.x1 = (p.x1 + ((p.x2 - p.x1) * s));
+								p.y1 = (p.y1 + ((p.y2 - p.y1) * s));
+								p.z1 = 0.1;
+							} else {
+								p.x2 = (p.x1 + ((p.x2 - p.x1) * s));
+								p.y2 = (p.y1 + ((p.y2 - p.y1) * s));
+								p.z2 = 0.1;
+							}
+						}
+						p.x1 = (this.camera.FOV * (p.x1 / p.z1));
+						p.y1 = (this.camera.FOV * (p.y1 / p.z1));
+						p.x2 = (this.camera.FOV * (p.x2 / p.z2));
+						p.y2 = (this.camera.FOV * (p.y2 / p.z2));
+						this.drawLine(p.x1, p.y1, p.x2, p.y2);
+					}
+				}
+				drawCube(x, y, z, w, h, d) {
+					this.drawLine3d(x, y, z, x + w, y, z);
+					this.drawLine3d(x, y, z + d, x + w, y, z + d);
+					this.drawLine3d(x, y, z, x, y, z + d);
+					this.drawLine3d(x + w, y, z, x + w, y, z + d);
+					this.drawLine3d(x, y + h, z, x + w, y + h, z);
+					this.drawLine3d(x, y + h, z + d, x + w, y + h, z + d);
+					this.drawLine3d(x, y + h, z, x, y + h, z + d);
+					this.drawLine3d(x + w, y + h, z, x + w, y + h, z + d);
+					this.drawLine3d(x, y, z, x, y + h, z);
+					this.drawLine3d(x + w, y, z, x + w, y + h, z);
+					this.drawLine3d(x + w, y, z + d, x + w, y + h, z + d);
+					this.drawLine3d(x, y, z + d, x, y + h, z + d);
+				}
+				playerMove(x, z) {
+					this.playerMoveZ(z);
+					this.playerMoveX(x);
+				}
+				playerMoveZ(move) {
+					this.player.x += -(move * this.camera.distance.sinX);
+					this.player.z += move * this.camera.distance.cosX;
+				}
+				playerMoveX(move) {
+					this.player.x += (move * this.camera.distance.cosX);
+					this.player.z += move * this.camera.distance.sinX;
+				}
+				getTerrain(x, y, z) {
+					if ((x >= 0 && y >= 0 && z >= 0)) {
+						if ((x < this.terrain.width) && (y < this.terrain.height) && (z < this.terrain.depth)) {
+							return this.terrain.terrainData[Math.floor(y) + (this.terrain.height * (Math.floor(x) + (this.terrain.depth * Math.floor(z))))]
+						}
+					}
+					return undefined;
+				}
+				step() {
+					this.timeTick++;
+					this.verY -= 0.0125;
+					if (this.moveZ == 1) {
+						this.verZ += -(this.playerSpeed * this.camera.distance.cosX);
+						this.verX += this.playerSpeed * this.camera.distance.sinX;
+					}
+					if (this.moveZ == 2) {
+						this.verZ += (this.playerSpeed * this.camera.distance.cosX);
+						this.verX += -(this.playerSpeed * this.camera.distance.sinX);
+					}
+					if (this.moveX == 1) {
+						this.verX += -(this.playerSpeed * this.camera.distance.cosX);
+						this.verZ += -(this.playerSpeed * this.camera.distance.sinX);
+					}
+					if (this.moveX == 2) {
+						this.verX += (this.playerSpeed * this.camera.distance.cosX);
+						this.verZ += (this.playerSpeed * this.camera.distance.sinX);
+					}
+					this.verX = (this.verX * 0.85);
+					this.player.x += this.verX;
+					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined) {
+						this.player.x -= this.verX;
+						this.verX = 0;
+					}
+					this.verZ = (this.verZ * 0.85);
+					this.player.z += this.verZ;
+					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined) {
+						this.player.z -= this.verZ;
+						this.verZ = 0;
+					}
+					this.player.y += this.verY;
+					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined) {
+						this.player.y -= this.verY;
+						this.verY = 0;
+					}
+					this.player.y -= 0.1;
+					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined) {
+						if (this.moveY == 1) {
+							this.verY = 0.25;
+						}
+					}
+					this.player.y += 0.1;
+					this.camera.position.x = this.player.x;
+					this.camera.position.y = this.player.y + this.player.height;
+					this.camera.position.z = this.player.z;
+
+					var g = 0;
+
+					while (g < 2) {
+						var gx = this.player.x + (((0 - this.camera.distance.sinX) * g) * this.camera.distance.cosY);
+						var gz = this.player.z - (((0 - this.camera.distance.cosX) * g) * this.camera.distance.cosY);
+						var gy = (this.player.y + this.player.height) + ((0 - this.camera.distance.sinY) * g);
+						if (this.getTerrain(gx, gy, gz) !== undefined) {
+							break;
+						}
+						g += 0.01;
+					}
+
+					this.camera.position.x += ((0 - this.camera.distance.sinX) * g) * this.camera.distance.cosY;
+					this.camera.position.z -= ((0 - this.camera.distance.cosX) * g) * this.camera.distance.cosY;
+					this.camera.position.y += (0 - this.camera.distance.sinY) * g;
+
+					if (this.player.y < -12) {
+						this.resetPlayer();
+					}
+				}
+				render() {
+					this.renderer.clear();
+					this.cameraDistance();
+					for (var w = Math.floor(this.camera.position.x - this.MaxDrawDistance); w < (this.camera.position.x + this.MaxDrawDistance); w++) {
+						for (var d = Math.floor(this.camera.position.z - this.MaxDrawDistance); d < this.camera.position.z + this.MaxDrawDistance; d++) {
+							for (var h = Math.floor(this.camera.position.y - this.MaxDrawDistance); h < this.camera.position.y + this.MaxDrawDistance; h++) {
+								if (Math.sqrt(((this.camera.position.x - w) * (this.camera.position.x - w)) + ((this.camera.position.z - d) * (this.camera.position.z - d)) + ((this.camera.position.y - h) * (this.camera.position.y - h))) < this.MaxDrawDistance) {
+									var gg = Math.sqrt(((this.camera.position.x - w) * (this.camera.position.x - w)) + ((this.camera.position.z - d) * (this.camera.position.z - d)) + ((this.camera.position.y - h) * (this.camera.position.y - h))) / this.MaxDrawDistance;
+									var f = this.getTerrain(w, h, d);
+									this.lineWidth = 2;
+									var c = ColorMap[mod(Math.floor(w + d + this.timeTick / 15), 6)];
+									this.u_color = [c[0], c[1], c[2], Math.min(1, (0 - gg) + 1)];
+									if (f !== undefined) {
+										this.drawCube(w, h, d, 1, 1, 1);
+									}
+								}
+							}
+						}
+					}
+					this.lineWidth = 2;
+					this.u_color = [0, 1, 0, 1];
+					for (var h = 0; h < 1000; h++) {
+						var f = this.getTerrain(this.player.x, this.player.y + (0 - (h / 50)), this.player.z);
+						if (f !== undefined) {
+							this.drawCube(this.player.x - 0.25, this.player.y + (0 - (h / 50)), this.player.z - 0.25, 0.5, 0, 0.5);
+							break;
+						}
+					}
+					this.lineWidth = 16;
+					this.u_color = [1, 0, 0, 1];
+					this.drawLine3d(this.player.x, this.player.y, this.player.z, this.player.x, this.player.y + this.player.height, this.player.z);
+					this.lineWidth = 2;
+					this.u_color = [1, 1, 1, 1];
+					this.drawLine(-15, 0, 15, 0);
+					this.drawLine(0, 15, 0, -15);
+					this.renderer.flush();
+				}
+			}
+		</script>
+		<script>
+			var game = new Game;
+			window.game = game;
+
+			var keys = {};
+
+			var gameArea = document.getElementById('game');
+
+			gameArea.appendChild(game.canvas);
+
+			var fps0 = document.getElementById('fps0');
+
+			function resize() {
+				game.camera.FOV = window.innerHeight / 2;
+				game.setWH(window.innerWidth, window.innerHeight);
+			}
+
+			gameArea.addEventListener("mousemove", function(e) {
+				var rect = gameArea.getBoundingClientRect();
+
+				var vvx = (e.x - rect.left);
+				var vvy = (e.y - rect.top);
+
+				game.camera.rotation.x = (vvx / 2);
+				game.camera.rotation.y = (-vvy + (game.height / 2)) / 2;
+				if (game.camera.rotation.y < -70) {
+					game.camera.rotation.y = -70;
+				}
+				if (game.camera.rotation.y > 70) {
+					game.camera.rotation.y = 70;
+				}
+				game.cameraDistance();
+			});
+
+			gameArea.addEventListener("keydown", function(e) {
+				keys[e.key] = true;
+			});
+			gameArea.addEventListener("keyup", function(e) {
+				keys[e.key] = false;
+			});
+
+			window.addEventListener("resize", function(e) {
+				resize();
+			});
+
+			var startFps = 0;
+			var fps = 0;
+
+			function fsdf() {
+				game.moveX = 0;
+				game.moveZ = 0;
+				game.moveY = 0;
+				if (keys['w']) {
+					game.moveZ = 1;
+				}
+				if (keys['s']) {
+					game.moveZ = 2;
+				}
+				if (keys['a']) {
+					game.moveX = 1;
+				}
+				if (keys['d']) {
+					game.moveX = 2;
+				}
+				if (keys[' ']) {
+					game.moveY = 1;
+				}
+				game.step();
+				game.render();
+				fps = Math.round(Math.min(60, (1000 / (Date.now() - startFps))));
+				startFps = Date.now();
+				fps0.textContent = "FPS: " + fps;
+			}
+
+			resize();
+
+			game.init();
+
+			startFps = Date.now();
+
+			setInterval(fsdf, 1000 / 60);
+		</script>
+	</body>
+</html>

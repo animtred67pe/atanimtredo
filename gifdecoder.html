@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Gif Decoder - Anim Tred Tools</title>
+		<style>
+			body{
+				margin: 0;
+				overflow: hidden;
+				font-family: monospace;
+				color: #fff;
+			}
+			a{
+				cursor: pointer;
+				text-decoration: underline;
+			}
+			.hfgfhh2{
+				position: absolute;
+				background-color: #000;
+				margin: 0;
+				padding: 0;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+			}
+			.splash, .error {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				display: table;
+				color: #fff;
+				cursor: default;
+			}
+			.error {
+				display: none;
+			}
+			.splash > div,
+			.error > div {
+				display: table-cell;
+				height: 100%;
+				text-align: center;
+				vertical-align: middle;
+			}
+			.progress {
+				width: 200px;
+				height: 10px;
+				border: 1px solid #fff;
+				margin: 0 auto;
+			}
+			.progress-bar {
+				background: #fff;
+				width: 10%;
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
+		<div class="hfgfhh2">
+			<canvas width="240" height="120" id="atgif" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></canvas>
+			<div class="splash">
+				<div>
+					<div class="progress">
+						<div class="progress-bar"></div>
+					</div>
+				</div>
+			</div>
+			<div style="padding: 5px 6px; position: absolute; top: 5px; left: 5px;">
+				<a id="loadmidifile">Open .gif</a>
+				<label id="midifiletitle"></label>
+				<br>
+				<label id="midifilesl"></label>
+			</div>
+		</div>
+		<script>
+			// Gif Decoder create on 20/1/2024
+			var ATGifStreamDecoder = (function() {
+				var ByteStream = function(buffer) {
+					this._position = 0;
+					this.buffer = buffer;
+					this.dataView = new DataView(this.buffer);
+					this.littleEndian = false;
+					this._length = this.buffer.byteLength;
+				};
+				Object.defineProperties(ByteStream.prototype, {
+					"position": {
+						get: function() {
+							return this._position;
+						},
+						set: function(value) {
+							this._position = value;
+						}
+					},
+					"length": {
+						get: function() {
+							return this.buffer.byteLength;
+						},
+					}
+				});
+				ByteStream.prototype.readString = function(length) {
+					var str = '';
+					for (var i = 0; i < length; i++) {
+						str += String.fromCharCode(this.dataView.getUint8(this._position++));
+					}
+				    return str;
+				};
+				ByteStream.prototype.readUint8 = function() {
+				    return this.dataView.getUint8(this._position++);
+				};
+				ByteStream.prototype.readUint16 = function() {
+					var val = this.dataView.getUint16(this._position, this.littleEndian);
+					this._position += 2;
+					return val;
+				};
+				ByteStream.prototype.readUint32 = function() {
+					var val = this.dataView.getUint32(this._position, this.littleEndian);
+					this._position += 4;
+				    return val;
+				};
+				ByteStream.prototype.readInt8 = function() {
+				    return this.dataView.getInt8(this._position++);
+				};
+				ByteStream.prototype.readInt16 = function() {
+					var val = this.dataView.getInt16(this._position, this.littleEndian);
+					this._position += 2;
+					return val;
+				};
+				ByteStream.prototype.readInt32 = function() {
+					var val = this.dataView.getInt32(this._position, this.littleEndian);
+					this._position += 4;
+				    return val;
+				};
+				ByteStream.prototype.readBytes = function(e, n) {
+				    var bytes = new Uint8Array(n + e);
+					for (var i = 0; i < n; i++) {
+						bytes[i + e] = this.dataView.getUint8(this._position + i);
+					}
+					this._position += n;
+				    return bytes;
+				};
+				var GIFBitmap = function(info, delay) {
+					this.canvas = document.createElement('canvas');
+					this.ctx = this.canvas.getContext("2d");
+					this.rect = info;
+					this.x = info.x;
+					this.y = info.y;
+					this.w = info.w;
+					this.h = info.h;
+					this.delay = info.delay;
+					this.data = new Uint32Array(this.w * this.h);
+					this.isLoad = false;
+				}
+				GIFBitmap.prototype.copyPixels = function(source) {
+					var sourceData = source.data;
+					var _x = source.x;
+					var _y = source.y;
+					for (var y = 0; y < source.h; y++) {
+						for (var x = 0; x < source.w; x++) {
+							var c = this.getPixel32(sourceData.x + x, sourceData.y + y);
+							this.setPixel32(this.x + x, this.y + y, c);
+						}
+					}
+				}
+				GIFBitmap.prototype.fillRect = function(color) {
+					for (var i = 0; i < this.h; i++) {
+						for (var i2 = 0; i2 < this.w; i2++) {
+							this.setPixel32(i2, i, color);
+						}
+					}
+				}
+				GIFBitmap.prototype.getPixel32 = function(x, y) {
+					var _x = x - this.x;
+					var _y = y - this.y;
+					if (((_x >= 0) && (_x < this.w)) && (_y >= 0) && (_y < this.h)) {
+						var id = (_x + (_y * this.w));
+						return this.data[id];
+					}
+					return 0;
+				}
+				GIFBitmap.prototype.setPixel32 = function(x, y, color) {
+					var _x = x - this.x;
+					var _y = y - this.y;
+					if (((_x >= 0) && (_x < this.w)) && (_y >= 0) && (_y < this.h)) {
+						var id = (_x + (_y * this.w));
+						var r4 = Math.floor(color / 0x1000000) % 256;
+						if (r4 == 0) {
+							this.data[id] = 0;
+							return;
+						}
+						this.data[id] = color;
+					}
+				}
+				GIFBitmap.prototype.toRGBA = function(color) {
+					var r1 = color % 256; // blue
+					var r2 = Math.floor(color / 0x100) % 256; // green
+					var r3 = Math.floor(color / 0x10000) % 256; // red
+					var r4 = Math.floor(color / 0x1000000) % 256; // aphat
+					return "rgba(" + r3 + ',' + r2 + ',' + r1 + ',' + (r4 / 255) + ')';
+				}
+				GIFBitmap.prototype.toRGBAHex = function(color) {
+					var r1 = color % 256; // blue
+					var r2 = Math.floor(color / 0x100) % 256; // green
+					var r3 = Math.floor(color / 0x10000) % 256; // red
+					var r4 = Math.floor(color / 0x1000000) % 256; // aphat
+					return [r3, r2, r1, r4];
+				}
+				GIFBitmap.prototype.render = function() {
+					if (this.isLoad) return;
+					var w = this.rect.w;
+					var h = this.rect.h;
+					var x = this.rect.x;
+					var y = this.rect.y;
+					var imageData = new ImageData(w, h);
+					var data = imageData.data;
+					this.canvas.width = w;
+					this.canvas.height = h;
+					for (var i = 0; i < ((w * h) * 4); i += 4) {
+						var srgb = this.toRGBAHex(this.data[i / 4]);
+						data[i] = srgb[0];
+						data[i + 1] = srgb[1];
+						data[i + 2] = srgb[2];
+						data[i + 3] = srgb[3];
+					}
+					this.ctx.putImageData(imageData, 0, 0);
+					this.isLoad = true;
+				}
+				var decodeGif = function(dataInfo) {
+					var _inStream = new ByteStream(dataInfo.gifData);
+					var _status = 0;
+					var _width = 0;
+					var _height = 0;
+					var _gctFlag = false;
+					var _gctSize = 0;
+					var _loopCount = 1;
+					var _gct = null; // Array
+					var _lct = null; // Array
+					var _act = null; // Array
+					var _bgIndex = 0;
+					var _bgColor = 0;
+					var _lastBgColor = 0;
+					var _pixelAspect = 0;
+					var _lctFlag = false;
+					var _interlace = false;
+					var _lctSize = 0;
+					var _ix = 0;
+					var _iy = 0;
+					var _iw = 0;
+					var _ih = 0;
+					var _lastRect = null;
+					var _image = null;
+					var _bitmap = null;
+					var _lastImage = null;
+					var _block = new Uint8Array(0);
+					var _blockSize = 0;
+					var _dispose = 0;
+					var _lastDispose = 0;
+					var _transparency = false;
+					var _delay = 0;
+					var _transIndex = 0;
+					var _prefix = null; // Array
+					var _suffix = null; // Array
+					var _pixelStack = null;
+					var _pixels = null;
+					var frames = null;
+					var frameCount = 0;
+
+					var STATUS_OK = 0;
+					var STATUS_FORMAT_ERROR = 1;
+					var STATUS_OPEN_ERROR = 2;
+					var MaxStackSize = 4096;
+
+					var done = false;
+
+					var _interval = null;
+					var _step = function() {
+						if (_hasError()) return;
+						var st = Date.now();
+						while ((Date.now() - st) < 20) {
+							readContent();
+							if (done) {
+								break;
+							}
+						}
+						if (done) {
+							if (frameCount < 0) _status = STATUS_FORMAT_ERROR;
+							clearInterval(_interval);
+							dataInfo.onload({
+								width: _width,
+								height: _height,
+								frames: frames
+							});
+						}
+						dataInfo.onprogress(_inStream.position / _inStream.length);
+					}
+
+					var _start = function() {
+						init();
+						readHeader();
+						_interval = setInterval(_step, 10);
+					};
+
+					var readHeader = function() {
+						var id = "";
+						for (var i = 0; i < 6; i++) {
+							id += String.fromCharCode(readSingleByte());
+						}
+						if (!(id.indexOf("GIF") == 0)) {
+							_status = STATUS_FORMAT_ERROR;
+							throw new Error("Invalid file type");
+						}
+						readLSD();
+						if (_gctFlag && !_hasError()) {
+							_gct = readColorTable(_gctSize);
+							_bgColor = _gct[_bgIndex];
+						}
+					};
+					var readSingleByte = function() {
+						var curByte = 0;
+						try {
+							curByte = _inStream.readUint8();
+						} catch (e) {
+							_status = STATUS_FORMAT_ERROR;
+						}
+						return curByte;
+					};
+					var readLSD = function() {
+						_width = readShort();
+						_height = readShort();
+						var packed = readSingleByte();
+						_gctFlag = (packed & 0x80) != 0;
+						_gctSize = 2 << (packed & 7);
+						_bgIndex = readSingleByte();
+						_pixelAspect = readSingleByte();
+					};
+					var readShort = function() {
+						return (readSingleByte() | (readSingleByte() << 8)) | 0;
+					};
+					var readColorTable = function(ncolors) {
+						var nbytes = 3 * ncolors;
+						var tab = null;
+						var c = new Uint8Array(0);
+						var n = 0;
+						try {
+							c = new Uint8Array(_inStream.readBytes(0, nbytes));
+							n = nbytes;
+						} catch (e) {
+						}
+						if (n < nbytes) {
+							_status = STATUS_FORMAT_ERROR;
+						} else {
+							tab = new Array(256); // max size to avoid bounds checks
+							var i = 0;
+							var j = 0;
+							while (i < ncolors) {
+								var r = (c[j++]) & 0xff;
+								var g = (c[j++]) & 0xff;
+								var b = (c[j++]) & 0xff;
+								tab[i++] = (0xff000000 | (r << 16) | (g << 8) | b);
+							}
+						}
+						return tab;
+					};
+					var _hasError = function() {
+						return _status != STATUS_OK;
+					};
+					var init = function() {
+						_status = STATUS_OK;
+						frameCount = 0;
+						frames = new Array;
+						_gct = null;
+						_lct = null;
+					};
+					var readContent = function() {
+						var code = readSingleByte();
+						switch (code) {
+							case 0x2C:
+								readImage();
+								break;
+							case 0x21:
+								code = readSingleByte();
+								switch (code) {
+									case 0xf9:
+										readGraphicControlExt();
+										break;
+									case 0xff:
+										readBlock();
+										var app = "";
+										for (var i = 0; i < 11; i++) {
+											app += _block[i];
+										}
+										if (app == "NETSCAPE2.0") {
+											readNetscapeExt();
+										} else
+											skip();
+										break;
+									default:
+										skip();
+										break;
+								}
+								break;
+							case 0x3b:
+								done = true;
+								break;
+							case 0x00:
+								break;
+							default:
+								_status = STATUS_FORMAT_ERROR;
+								break;
+						}
+					};
+					var readImage = function() {
+						_ix = readShort();
+						_iy = readShort();
+						_iw = readShort();
+						_ih = readShort();
+						var packed = readSingleByte();
+						_lctFlag = (packed & 0x80) != 0;
+						_interlace = (packed & 0x40) != 0;
+						_lctSize = 2 << (packed & 7);
+						if (_lctFlag) {
+							_lct = readColorTable(_lctSize);
+							_act = _lct;
+						} else {
+							_act = _gct; // make global table active
+							if (_bgIndex == _transIndex) _bgColor = 0;
+						}
+						var save = 0;
+						if (_transparency) {
+							save = _act[_transIndex];
+							_act[_transIndex] = 0;
+						}
+						if (_act == null) _status = STATUS_FORMAT_ERROR;
+						if (_hasError()) return;
+						decodeImageData();
+						skip();
+						if (_hasError()) return;
+						frameCount++;
+						_image = _bitmap = new GIFBitmap({x: _ix, y: _iy, w: _iw, h: _ih, delay: _delay});
+						transferPixels();
+						frames.push(_bitmap);
+						if (_transparency) _act[_transIndex] = save;
+						resetFrame();
+					};
+					var decodeImageData = function() {
+						var NullCode = -1;
+						var npix = _iw * _ih;
+						var available = 0;
+						var clear = 0;
+						var code_mask = 0;
+						var code_size = 0;
+						var end_of_information = 0;
+						var in_code = 0;
+						var old_code = 0;
+						var bits = 0;
+						var code = 0;
+						var count = 0;
+						var i = 0;
+						var datum = 0;
+						var data_size = 0;
+						var first = 0;
+						var top = 0;
+						var bi = 0;
+						var pi = 0;
+						if ((_pixels == null) || (_pixels.length < npix)) _pixels = new Array(npix);
+						if (_prefix == null) _prefix = new Array(MaxStackSize);
+						if (_suffix == null) _suffix = new Array(MaxStackSize);
+						if (_pixelStack == null) _pixelStack = new Array(MaxStackSize + 1);
+						data_size = readSingleByte();
+						clear = 1 << data_size;
+						end_of_information = clear + 1;
+						available = clear + 2;
+						old_code = NullCode;
+						code_size = data_size + 1;
+						code_mask = (1 << code_size) - 1;
+						for (code = 0; code < clear; code++) {
+							_prefix[code | 0] = 0;
+							_suffix[code | 0] = code;
+						}
+						datum = bits = count = first = top = pi = bi = 0;
+						for (i = 0; i < npix;) {
+							if (top == 0) {
+								if (bits < code_size) {
+									if (count == 0) {
+										count = readBlock();
+										if (count <= 0) break;
+										bi = 0;
+									}
+									datum += ((_block[bi] | 0) & 0xff) << bits;
+									bits += 8;
+									bi++;
+									count--;
+									continue;
+								}
+								code = datum & code_mask;
+								datum >>= code_size;
+								bits -= code_size;
+								if ((code > available) || (code == end_of_information)) break;
+								if (code == clear) {
+									code_size = data_size + 1;
+									code_mask = (1 << code_size) - 1;
+									available = clear + 2;
+									old_code = NullCode;
+									continue;
+								}
+								if (old_code == NullCode) {
+									_pixelStack[(top++) | 0] = _suffix[code | 0];
+									old_code = code;
+									first = code;
+									continue;
+								}
+								in_code = code;
+								if (code == available) {
+									_pixelStack[(top++) | 0] = first;
+									code = old_code;
+								}
+								while (code > clear) {
+									_pixelStack[(top++) | 0] = _suffix[code | 0];
+									code = _prefix[code | 0];
+								}
+								first = (_suffix[code | 0]) & 0xff;
+								if (available >= MaxStackSize) break;
+								_pixelStack[(top++) | 0] = first;
+								_prefix[available | 0] = old_code;
+								_suffix[available | 0] = first;
+								available++;
+								if (((available & code_mask) == 0) && (available < MaxStackSize)) {
+									code_size++;
+									code_mask += available;
+								}
+								old_code = in_code;
+							}
+							top--;
+							_pixels[(pi++) | 0] = _pixelStack[top | 0];
+							i++;
+						}
+						for (i = pi; i < npix; i++) {
+							_pixels[i | 0] = 0;
+						}
+					};
+					var transferPixels = function() {
+						if (_lastDispose > 0) {
+							if (_lastDispose == 3) {
+								var n = frameCount - 2;
+								_lastImage = n >= 0 ? frames[n] : null;
+							}
+							if (_lastImage != null) {
+								_bitmap.copyPixels(_lastImage);
+								if (_lastDispose == 2) {
+									var c = _transparency ? 0x00000000 : _lastBgColor;
+									_bitmap.fillRect(c);
+								}
+							}
+						}
+						var dest = getPixels(_bitmap);
+						var pass = 1;
+						var inc = 8;
+						var iline = 0;
+						for (var i = 0; i < _ih; i++) {
+							var line = i;
+							if (_interlace) {
+								if (iline >= _ih) {
+									pass++;
+									switch (pass) {
+										case 2:
+											iline = 4;
+											break;
+										case 3:
+											iline = 2;
+											inc = 4;
+											break;
+										case 4:
+											iline = 1;
+											inc = 2;
+											break;
+									}
+								}
+								line = iline;
+								iline += inc;
+							}
+							line += _iy;
+							if (line < _height) {
+								var k = (line * _width) | 0;
+								var dx = (k + _ix) | 0; // start of line in dest
+								var dlim = (dx + _iw) | 0; // end of dest line
+								if ((k + _width) < dlim) {
+									dlim = k + _width; // past dest edge
+								}
+								var sx = (i * _iw) | 0; // start of line in source
+								var index = 0;
+								var tmp = 0;
+								while (dx < dlim) {
+									index = (_pixels[sx++]) & 0xff;
+									tmp = _act[index];
+									if (tmp != 0) {
+										dest[dx] = tmp;
+									}
+									dx++;
+								}
+							} 
+						}
+						setPixels(dest);
+					};
+					var getPixels = function(bitmap) {
+						var pixels = new Array(_width * _height);
+						var count = 0;
+						var lngWidth = _width;
+						var lngHeight = _height;
+						var color = 0;
+						for (var th = 0; th < lngHeight; th++) {
+							for (var tw = 0; tw < lngWidth; tw++) {
+								color = bitmap.getPixel32(tw, th);
+								pixels[count++] = color;
+							}
+						}
+						return pixels;
+					};
+					var setPixels = function(pixels) {
+						var count = 0;
+						var color;
+						var lngWidth = _width;
+						var lngHeight = _height;
+						for (var th = 0; th < lngHeight; th++) {
+							for (var tw = 0; tw < lngWidth; tw++) {
+								color = pixels[count++];
+								_bitmap.setPixel32(tw, th, color);
+							}
+						}
+					};
+					var resetFrame = function() {
+						_lastDispose = _dispose;
+						_lastRect = [_ix, _iy, _iw, _ih];
+						_lastImage = _image;
+						_lastBgColor = _bgColor;
+						_transparency = false;
+						_lct = null;
+					};
+					var readGraphicControlExt = function() {
+						readSingleByte(); // block size
+						var packed = readSingleByte(); // packed fields
+						_dispose = (packed & 0x1c) >> 2; // disposal method
+						if (_dispose == 0) {
+							_dispose = 1; // elect to keep old image if discretionary
+						}
+						_transparency = (packed & 1) != 0;
+						_delay = (readShort() * 10); // delay in milliseconds
+						_transIndex = readSingleByte(); // transparent color index
+						readSingleByte(); // block terminator
+					};
+					var readBlock = function() {
+						_blockSize = readSingleByte();
+						var n = 0;
+						if (_blockSize > 0) {
+							try {
+								var count = 0;
+								while (n < _blockSize) {
+									_block = _inStream.readBytes(n, _blockSize - n);
+									if ((_blockSize - n) == -1) break;
+									n += (_blockSize - n);
+								}
+							} catch (e) {
+							}
+							if (n < _blockSize) _status = STATUS_FORMAT_ERROR;
+						}
+						return n;
+					};
+					var readNetscapeExt = function() {
+						do {
+							_readBlock();
+							if (block[0] == 1) {
+								var b1 = (_block[1]) & 0xff;
+								var b2 = (_block[2]) & 0xff;
+								_loopCount = (b2 << 8) | b1;
+							}
+						} while ((_blockSize > 0) && !_hasError());
+					};
+					var skip = function() {
+						do {
+							readBlock();
+						} while ((_blockSize > 0) && !_hasError());
+					};
+					_start();
+				}
+				return {
+					decodeGif
+				}
+			}());
+		</script>
+		<script>
+			(function() {
+				function getDuraction(num) {
+			        var txt = '';
+			        var _ms = Math.floor(num);
+			        var _mm = Math.floor(num / 60);
+			    
+			        var ms = _ms % 60;
+			        var mm = _mm % 60;
+			        var mh = Math.floor(num / 3600);
+			        if (_mm >= 60) {
+			            txt += '' + mh;
+			            txt += ':';
+			        }
+			        if ((mm >= 10) || (_ms < 600)) {
+			            txt += '' + mm;
+			        } else {
+			            txt += '0' + mm;
+			        }
+			        txt += ':';
+			        if (ms >= 10) {
+			            txt += '' + ms;
+			        } else {
+			            txt += '0' + ms;
+			        }
+			        return txt;
+			    }
+				var atgif = document.getElementById('atgif');
+				var midifiletitle = document.getElementById('midifiletitle');
+				var midifilesl = document.getElementById('midifilesl');
+				var ctx = atgif.getContext('2d');
+				var splash = document.querySelector('.splash');
+				var gids = [];
+				var gidslen = 0;
+				splash.style.display = 'none';
+				atgif.style.display = 'none';
+				var progressBarFill = document.querySelector('.progress-bar');
+				function TSProgress(e) {
+					progressBarFill.style.width = (e * 100) + '%';
+				}
+				var rrr = null;
+				atgif.onclick = function (e) {
+					gidslen++;
+					if (gidslen >= gids.length) gidslen = 0;
+					loadMidiFile(gids[gidslen]);
+				}
+				function startG(result) {
+					if (rrr) clearInterval(rrr);
+					splash.style.display = 'none';
+					atgif.style.display = '';
+					atgif.width = result.width;
+					atgif.height = result.height;
+					var ff = 0;
+					for (var i = 0; i < result.frames.length; i++) {
+						ff += result.frames[i].delay;
+					}
+					var f1 = 0;
+					var _sta = Date.now();
+					var _sta1 = 0;
+					var ggggg = Date.now();
+					var _d = true;
+					rrr = setInterval(function (argument) {
+						if (((f1 % result.frames.length) == 0) && _d) {
+							ctx.clearRect(0, 0, result.width, result.height);
+							ggggg = Date.now();
+						}
+						var im = result.frames[f1 % result.frames.length];
+						if (_d) {
+							im.render();
+							ctx.drawImage(im.canvas, im.x, im.y);
+							_d = false;
+						}
+						if ((Date.now() - _sta) >= (im.delay - _sta1)) {
+							_d = true;
+							f1++;
+							_sta1 -= im.delay;
+						}
+						midifilesl.textContent = "Time: " + getDuraction((Date.now() - ggggg) / 1000) + " / " + getDuraction(ff / 1000) +  " Frames: " + ((f1 % result.frames.length) + 1) + "/" + result.frames.length;
+					}, 5);
+				}
+				function loadMidiFile(file) {
+					var a = new FileReader();
+					a.onload = (function() {
+						setTimeout(function () {
+							midifiletitle.textContent = file.name;
+							splash.style.display = '';
+							atgif.style.display = 'none';
+							TSProgress(0);
+							if (rrr) clearInterval(rrr);
+							midifilesl.textContent = "";
+							ATGifStreamDecoder.decodeGif({gifData: a.result, onload: startG, onprogress: TSProgress});
+						}, 2);
+					}).bind(this);
+					a.readAsArrayBuffer(file);
+				}
+				function addMidiFile(file) {
+					gids.push(file);
+				}
+				function dropHandler(ev) {
+					ev.preventDefault();
+					if (ev.dataTransfer.items) {
+						[...ev.dataTransfer.items].forEach((item, i) => {
+							if (item.kind === 'file') {
+								const file = item.getAsFile();
+								loadMidiFile(file);
+							}
+						});
+					}
+				}
+				function dragOverHandler(ev) {
+					ev.preventDefault();
+				}
+				var loadmidifile = document.getElementById('loadmidifile');
+				loadmidifile.onclick = function () {
+					var sa = document.createElement('input');
+					sa.type = 'file';
+					sa.accept = '.gif';
+					sa.multiple = true;
+					sa.addEventListener('change', function (e) {
+						gids = [];
+						gidslen = 0;
+						for (var i = 0; i < e.target.files.length; i++) {
+							addMidiFile(e.target.files[i]);
+						}
+						gidslen = 0;
+						loadMidiFile(gids[gidslen]);
+					}, false);
+					sa.click();
+				}
+			}());
+		</script>
+	</body>
+</html>

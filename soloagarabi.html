@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Solo Agarabi - Anim Tred Tools</title>
+		<style type="text/css">
+			body {
+				background: #000;
+				margin: 0;
+				overflow: hidden;
+			}
+			canvas {
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<script>
+			class SoloAgarin {
+				constructor() {
+					this.canvas = document.createElement('canvas');
+					this.ctx = this.canvas.getContext("2d");
+					this.step = this.step.bind(this);
+					this.balls = [];
+					this.siz = 8;
+					this._ = 0;
+					this.gameplay = false;
+					this.onMouseMove = this.onMouseMove.bind(this);
+					this.onMouseDown = this.onMouseDown.bind(this);
+					document.addEventListener('mousemove', this.onMouseMove);
+					document.addEventListener('mousedown', this.onMouseDown);
+					this.rescale(1);
+				}
+				onMouseMove(e) {
+					var bb = this.canvas.getBoundingClientRect();
+					var x = (e.clientX - bb.left);
+					var y = (e.clientY - bb.top);
+					this._mouseX = x;
+					this._mouseY = y;
+				}
+				onMouseDown() {
+					if (!this.gameplay) {
+						this.gameplay = true;
+						this.siz = 8;
+						this.balls.length = 0;
+					}
+				}
+				setWH(w, h) {
+					this.width = w;
+					this.height = h;
+				}
+				resize(w, h) {
+					this.canvas.width = w;
+					this.canvas.height = h;
+				}
+				rescale(scale) {
+					this.scale = scale;
+				}
+				start() {
+					this.interval = setInterval(this.step, 1000 / 60);
+				}
+				createBall() {
+					var f = Math.round(Math.random() * 3);
+					var kk = (this.siz - 4) + (Math.random() * 6);
+					if (f == 0) {
+						this.balls.push([0 - kk, Math.random() * this.height, kk, (Math.random() * 200), 5 + (Math.random() * 10), -5 + (Math.random() * 10), false]);
+					} else if (f == 1) {
+						this.balls.push([this.width + kk, Math.random() * this.height, kk, (Math.random() * 200), 0 - (5 + (Math.random() * 10)), -5 + (Math.random() * 10), false]);
+					} else if (f == 2) {
+						this.balls.push([Math.random() * this.width, 0 - kk, kk, (Math.random() * 200), -5 + (Math.random() * 10), (5 + (Math.random() * 10)), false]);
+					} else if (f == 3) {
+						this.balls.push([Math.random() * this.width, this.height + kk, kk, (Math.random() * 200), -5 + (Math.random() * 10), 0 - (5 + (Math.random() * 10)), false]);
+					}
+				}
+				step() {
+					this._ -= 1;
+					if (this._ < 0) {
+						this.createBall();
+						this._ = 4;
+					}
+					for (var i = 0; i < this.balls.length; i++) {
+						var g = this.balls[i];
+						g[0] += (g[4] / 12);
+						g[1] += (g[5] / 12);
+						if (g[0] < (g[2] * -1) || g[0] > (this.width + g[2]) || g[1] < (g[2] * -1) || g[1] > this.height + g[2]) {
+							g[6] = true;
+						}
+						var k1 = (g[0] - this.mouseX);
+						var k2 = (g[1] - this.mouseY);
+						if (this.gameplay) {
+							if (Math.sqrt((k1 * k1) + (k2 * k2)) < (g[2] + this.siz)) {
+								g[6] = true;
+								if (g[2] > this.siz) {
+									this.gameplay = false;
+								}
+								this.siz += 0.25;
+							}
+						}
+					}
+					this.ctx.clearRect(0, 0, this.width * this.scale, this.height * this.scale);
+					this.ctx.save();
+					this.ctx.scale(this.scale, this.scale);
+					for (var i = 0; i < this.balls.length; i++) {
+						var g = this.balls[i];
+						this.ctx.beginPath();
+						this.ctx.fillStyle = 'hsl(' + g[3] + ', 100%, 50%)';
+						this.ctx.arc(g[0], g[1], g[2], 0, 2 * Math.PI);
+						this.ctx.fill();
+					}
+					if (this.gameplay) {
+						this.ctx.beginPath();
+						this.ctx.fillStyle = '#fff';
+						this.ctx.arc(this.mouseX, this.mouseY, this.siz, 0, 2 * Math.PI);
+						this.ctx.fill();
+					}
+					this.ctx.restore();
+					var gh = [];
+					for (var i = 0; i < this.balls.length; i++) {
+						var g2 = this.balls[i];
+						if (g2[6] == false) {
+							gh.push(g2);
+						}
+					}
+					this.balls = gh;
+				}
+				get mouseX() {
+					return this._mouseX;
+				}
+				get mouseY() {
+					return this._mouseY;
+				}
+			}
+		</script>
+		<script>
+			var g = new SoloAgarin();
+			document.body.appendChild(g.canvas);
+			function resize() {
+				g.rescale((window.devicePixelRatio || 1));
+				g.setWH(window.innerWidth, window.innerHeight);
+				g.resize(window.innerWidth * (window.devicePixelRatio || 1), window.innerHeight * (window.devicePixelRatio || 1));
+			}
+			window.addEventListener('resize', resize);
+			resize();
+			g.start();
+		</script>
+	</body>
+</html>
