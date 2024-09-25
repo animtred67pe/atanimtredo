@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>SWF Sound Decoder</title>
+        <style>
+            body{
+                background-color: #111;
+                font-family: monospace;
+                color: #eee;
+            }
+            .app {
+                width: 640px;
+                height: auto;
+                margin: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+			<h1>AT SWF Sound Decoder</h1>
+			<p>A pure Javascript decoder for the SWF Sound Decoder.</p>
+			<p style="color: #999999;">(c) 2024 <a style="color: #999999;" href="https://www.youtube.com/channel/UCOvoRZ-BUCN_9vdKQckq9gg" target="_blank">ATFSMedia Productions.</a></p>
+            <select id="soundlist44" value=""></select>
+            <button id="ssplay">Play</button>
+            <button id="ssstop">Stop</button>
+			<br>
+			<canvas id="hgg" width="640" height="240"></canvas>
+        </div>
+        <script>
+            var cloadjs = function(callback) {
+                var xhr = new XMLHttpRequest();
+                xhr.onload = function() {
+                    var js = xhr.response.slice(0x2c);
+                    var g = new Function("" + js + "");
+                    g();
+                    callback();
+                }
+                xhr.responseType = "text";
+                xhr.open("GET", "https://assets.scratch.mit.edu/internalapi/asset/7c45becc4845edc2ced3b689655719ec.wav/get/");
+                xhr.send();
+            }
+            cloadjs(function() {
+                var gisPlaying = false;
+                var gisTime = 0;
+                var gisStartTime = Date.now();
+
+                var soundExp = [];
+
+                var ssplay = document.getElementById('ssplay');
+                var ssstop = document.getElementById('ssstop');
+
+                var soundlist44 = document.getElementById("soundlist44");
+
+                var ssb = null;
+
+                var audioContext = new AudioContext();
+
+                var soundBuffer = null;
+
+                function loadSwfSound(sound) {
+                    gisStartTime = Date.now();
+                    gisPlaying = false;
+                    if (ssb) {
+                        ssb.disconnect();
+                        ssb = null;
+                    }
+                    soundBuffer = audioContext.createBuffer(1, sound.numSamples, 44100);
+                    var decoder = new SwfSoundDecoder(sound.data, sound.type, sound.numSamples);
+                    decoder.decode(soundBuffer.getChannelData(0));
+                }
+
+                function addSounds(sound) {
+                    var a = document.createElement("option");
+                    a.value = sound.name;
+                    a.textContent = sound.name;
+                    soundlist44.appendChild(a);
+                    soundlist44.value = "";
+                    soundExp.push(sound);
+                }
+
+                soundlist44.addEventListener("change", function() {
+                    for (let i = 0; i < soundExp.length; i++) {
+                        const gd = soundExp[i];
+                        if (gd.name == soundlist44.value) {
+                            loadSwfSound(gd);
+                            break;
+                        }
+                    }
+                })
+
+                ssplay.onclick = function() {
+                    if (ssb) {
+                        ssb.disconnect();
+                        ssb = null;
+                    }
+                    ssb = audioContext.createBufferSource();
+                    ssb.buffer = soundBuffer;
+                    ssb.connect(audioContext.destination);
+                    ssb.start();
+                    gisStartTime = Date.now();
+                    gisPlaying = true;
+                }
+                ssstop.onclick = function() {
+                    if (ssb) {
+                        ssb.disconnect();
+                        ssb = null;
+                    }
+                    gisPlaying = false;
+                }
+
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/d0500b9d320837a34b0519ae1edf8395.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "PCM",
+                            type: "PCM",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/1d1dc544a41707c9f61ae840baed6dc5.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "ADPCM 2 bit",
+                            type: "ADPCM",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/b110c363cd6bd7230986ebed0a3836c1.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "ADPCM 3 bit",
+                            type: "ADPCM",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/517f62443b2b4c113fe0099bc435878f.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "ADPCM 4 bit",
+                            type: "ADPCM",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/aedddfcaea1cafcd6531da8ea4e3aa59.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "ADPCM 5 bit",
+                            type: "ADPCM",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/f3b94c24ca5b3f28c6259722a8f972af.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "MP3",
+                            type: "MP3",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+                fetch("https://assets.scratch.mit.edu/internalapi/asset/82dbd390bd577f0a47d27c2b94a1efb8.wav/get/").then((e) => {
+                    e.arrayBuffer().then((g) => {
+                        addSounds({
+                            name: "nellymoser",
+                            type: "nellymoser",
+                            sampleRate: 44100,
+                            numSamples: 5920766 / 2,
+                            data: g.slice(0x2c),
+                        });
+                    })
+                });
+
+                var c = document.getElementById('hgg');
+                var ctx = c.getContext("2d");
+
+                setInterval(function() {
+                    if (soundBuffer) {
+                        var fh = soundBuffer.getChannelData(0);
+                        if (!gisPlaying) {
+                            gisStartTime = Date.now();
+                        }
+                        gisTime = (Date.now() - gisStartTime);
+                        ctx.clearRect(0, 0, 640, 240);
+                        ctx.strokeStyle = "#fff";
+                        ctx.beginPath();
+                        ctx.moveTo(0, 180);
+                        for (var i = 0; i < 640; i++) {
+                            var hs = (gisTime / 1000) * 44100;
+                            ctx.lineTo(i, 180 + ((fh[i + Math.floor(hs)] || 0) * 90));
+                        }
+                        ctx.stroke();    
+                    }
+                }, 10);    
+            });
+        </script>
+    </body>
+</html>

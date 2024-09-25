@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>AT P3D Player 1</title>
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+				background: #000;
+				font-family: monospace;
+			}
+			a {
+				color: #fff;
+				cursor: pointer;
+				text-decoration: underline;
+			}
+			#opesw {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+			}
+			#sasw {
+				position: absolute;
+				top: 10px;
+				right: 10px;
+				float: right;
+				display: inline-block;
+				position: relative;
+			}
+			#sasw > select {
+				position: absolute;
+				font: inherit;
+				opacity: 0;
+				cursor: pointer;
+				top: 0px;
+				left: 0px;
+				width: 100%;
+				height: 100%;
+			}
+			#pinkswf {
+				position: absolute;
+				top: 0;
+				left: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="pinkswf"></div>
+		<a id="opesw">Open .p3d</a>
+		<a id="sasw">Sample p3d
+			<select id="ecdx">
+				<option value="" style="display: none;"></option>
+				<option value="81a51b78592258c18c5d4764fb749825.wav">1</option>
+				<option value="8d75b799d79ca436edbfdd16e0d92557.wav">2</option>
+				<option value="6cfad47da49e1895db2e2300032bd748.wav">3</option>
+				<option value="20fe1a6b1518b7f47982f2f2656f8c0f.wav">4</option>
+				<option value="7c87e4450f3f798fe879b34918cf97d7.wav">5</option>
+				<option value="538d0489dfa19bbfc1a0017eeeb91911.wav">6</option>
+				<option value="c4291556979562daf90a87b2a43912f9.wav">7</option>
+				<option value="8859a904148b2a10ca0ca161508dc490.wav">8</option>
+				<option value="16a218926c78c4ef1b34704f0391c83b.wav">9</option>
+				<option value="c4f5a600d05a47dbad12db448963ee56.wav">10</option>
+				<option value="4fbc57904e6a8eb9b0f770b588ffd667.wav">11</option>
+				<option value="a33a12a39b06dc04f61552315db62cc5.wav">12</option>
+			</select>
+		</a>
+		<script>
+			var P3D = (function() {
+				const Byte = function(arrayBuffer) {
+			        this.arrayBuffer = arrayBuffer;
+			        this._position = 0;
+			        this.viewData = new DataView(this.arrayBuffer, 0);
+			    }
+				Byte.prototype.byteAva = function() {
+					return this.arrayBuffer.byteLength - this._position;
+				}
+				Byte.prototype.readBytes = function(length) {
+					var res = this.arrayBuffer.slice(this._position, this._position + length);
+					return this._position += length,res
+				}
+				Byte.prototype.readUint8 = function() {
+					return this.viewData.getUint8(this._position++);
+				}
+				Byte.prototype.readUint16 = function() {
+					var val = this.viewData.getUint16(this._position, true);
+					return this._position += 2,val
+				}
+				Byte.prototype.readUint32 = function() {
+					var val = this.viewData.getUint32(this._position, true);
+					return this._position += 4,val
+				}
+				Byte.prototype.readInt16 = function() {
+					var val = this.viewData.getInt16(this._position, true);
+					return this._position += 2,val
+				}
+
+				// 1 HUN 8BIT 6 * 6 * 6
+				const hunToRGB = function(h) {
+			        var r = Math.round(((Math.floor(h / 36) % 6) / 5) * 255);
+			        var g = Math.round(((Math.floor(h / 6) % 6) / 5) * 255);
+			        var b = Math.round(((h % 6) / 5) * 255);
+			        return (b + (g * 256) + (r * 65536));
+			    }
+				const HUNDecoder = function(w, h) {
+					this.width = w;
+					this.height = h;
+					this.dataImage = new Uint32Array(w * h);
+					this.dataImage.fill(16581375);
+				}
+				HUNDecoder.prototype.reset = function() {
+					this.dataImage.fill(16581375);
+				}
+				HUNDecoder.prototype.decode = function(buffer) {
+					var b = new Byte(buffer);
+					var blockLen = b.readUint8();
+					while(true) {
+						var isFlag = b.readUint8();
+						if (isFlag == 0) break;
+						var blockX = b.readUint8() * blockLen;
+						var blockY = b.readUint8() * blockLen;
+						var data = new Uint16Array(blockLen*blockLen);
+						for (var i = 0; i < data.length; i++) {
+							data[i] = b.readUint8();
+						}
+				    	for (var h = 0; h < blockLen; h++) {
+			        		for (var t = 0; t < blockLen; t++) {
+			        			var hx = blockX + h;
+			        			var hy = blockY + t;
+			        			var hi = hx + (hy * this.width);
+			        			this.dataImage[hi] = hunToRGB(data[h + (t * blockLen)]);
+			        		}
+			        	}
+					}
+				}
+				const R8Decoder = function(buffer, samplePerBlock) {
+					this.buffer = buffer;
+					this.lf = buffer.getChannelData(0);
+					this.rf = 0 ? buffer.getChannelData(0) : null;
+					this.samplePerBlock = samplePerBlock;
+					this.sid = 0;
+				}
+				R8Decoder.prototype.decode = function(data) {
+					var b = new Byte(data);
+					try {
+						while(b.byteAva() > 0) {
+							this.lf[this.sid++] = ((b.readUint8() - 128) / 128);
+						}
+					} catch(e) {
+					}
+				}
+
+				const P2DParser = function(buffer) {
+					this.byte = new Byte(buffer);
+				}
+				P2DParser.prototype.byteAva = function() {
+					return this.byte.byteAva();
+				}
+				P2DParser.prototype.readHeader = function() {
+					this.byte.readUint8();
+					this.byte.readUint8();
+					this.byte.readUint8();
+					var unc = this.byte.readUint8();
+					var ver = this.byte.readUint8();
+					return {
+						completion: unc,
+						verion: ver
+					}
+				}
+				P2DParser.prototype.readFormat = function() {
+					var width = this.byte.readUint16();
+					var height = this.byte.readUint16();
+					var frameRate = this.byte.readUint8();
+					var numFrames = this.byte.readUint16();
+					var typeVideo = this.byte.readUint8();
+					var typeAudio = this.byte.readUint8();
+					return {
+						width,
+						height,
+						frameRate,
+						numFrames,
+						typeVideo,
+						typeAudio,
+					}
+				}
+				P2DParser.prototype.readAudioFormat = function() {
+					var typRate = this.byte.readUint8();
+					var rate;
+					switch(typRate) {
+						case 0:
+							rate = 11025;
+							break;
+						case 1:
+							rate = 22050;
+							break;
+						case 2:
+							rate = 44100;
+							break;
+					}
+					var channels = (this.byte.readUint8() ? 2 : 1);
+					var samplePerBlock = this.byte.readUint16();
+					return {
+						rate,
+						channels,
+						samplePerBlock
+					}
+				}
+				P2DParser.prototype.readVideoData = function() {
+					var len = this.byte.readUint32();
+					return this.byte.readBytes(len);
+				}
+				P2DParser.prototype.readFrame = function(stateVideo, stateAudio) {
+					var hun;
+					hun = this.readVideoData();
+					var au = null;
+					au = this.readVideoData();
+					return {
+						videoData: hun,
+						audioData: au,
+					}
+				}
+				const MovieP3D = function() {
+					this.audioContext = new AudioContext();
+					this.node = this.audioContext.createGain();
+					this.node.connect(this.audioContext.destination);
+					this.canvas = document.createElement('canvas');
+					this.canvas.width = 100;
+					this.canvas.height = 100;
+			        this.ctx = this.canvas.getContext("2d");
+					this.width = 100;
+					this.height = 100;
+					this.frameRate = 12;
+					this.numFrames = 0;
+					this.frameId = 0;
+					this.audioBuffer = null;
+					this.sourceBuffer = null;
+					this.dirty = false;
+					this.frames = [];
+					this.typeVideo = 0;
+					this.typeAudio = 0;
+					this.frameAccumulator = 0;
+					this.videoDecoder = null;
+					this.audioDecoder = null;
+					this.isPlaying = true;
+				}
+				MovieP3D.prototype.destroy = function() {
+					if (this.sourceBuffer) {
+						this.sourceBuffer.disconnect();
+						this.sourceBuffer = null;
+					}
+				}
+				MovieP3D.prototype.getVolume = function() {
+					return this.node.gain.value * 100;
+				}
+				MovieP3D.prototype.setVolume = function(volume) {
+					this.node.gain.value = volume / 100;
+				}
+				MovieP3D.prototype.play = function() {
+					this.isPlaying = true;
+					if (this.isPlaying) this.playAudio(this.frameId / this.frameRate);
+				}
+				MovieP3D.prototype.pause = function() {
+					this.isPlaying = false;
+					if (this.sourceBuffer) {
+						this.sourceBuffer.disconnect();
+						this.sourceBuffer = null;
+					}
+				}
+				MovieP3D.prototype.setWH = function(w, h) {
+					this.canvas.width = w;
+					this.canvas.height = h;
+					this.width = w;
+					this.height = h;
+				}
+				MovieP3D.prototype.getDuration = function() {
+					return this.numFrames / this.frameRate
+				}
+				MovieP3D.prototype.runFrame = function() {
+					if (this.frameId >= this.frames.length) {
+						this.videoDecoder.reset();
+						this.frameId = 0;
+						if (this.isPlaying) this.playAudio();
+					}
+					this.videoDecoder.decode(this.frames[this.frameId].videoData);
+					this.frameId++;
+					this.dirty = true;
+				}
+				MovieP3D.prototype.gotoFrame = function(frame) {
+					var isR = frame < this.frameId;
+					if (isR) {
+						this.videoDecoder.reset();
+						this.frameId = 0;
+					}
+					while (this.frameId < frame) {
+						this.videoDecoder.decode(this.frames[this.frameId].videoData);
+						this.frameId++;
+					}
+					this.dirty = true;
+					if (this.isPlaying) this.playAudio(this.frameId / this.frameRate);
+				}
+				MovieP3D.prototype.loadP3d = function(buffer) {
+					var parser = new P2DParser(buffer);
+					var he = parser.readHeader();
+					var rs = parser.readFormat();
+					this.setWH(rs.width, rs.height);
+					this.frameRate = rs.frameRate;
+					this.numFrames = rs.numFrames;
+					this.typeVideo = rs.typeVideo;
+					this.typeAudio = rs.typeAudio;
+					var ga;
+					ga = parser.readAudioFormat();
+					var audioBuffer = this.audioContext.createBuffer(ga.channels, ga.samplePerBlock * this.numFrames, ga.rate);
+					this.audioBuffer = audioBuffer;
+					var frames = this.frames;
+					while(parser.byteAva() > 0) {
+						var g = parser.readFrame(this.typeVideo, this.typeAudio);
+						frames.push(g);
+					}
+					this.videoDecoder = new HUNDecoder(rs.width, rs.height);
+					this.audioDecoder = new R8Decoder(audioBuffer, ga.samplePerBlock);
+					for (var i = 0; i < frames.length; i++) {
+						this.audioDecoder.decode(frames[i].audioData);
+					}
+					this.playAudio();
+				}
+				MovieP3D.prototype.tick = function(deltaTime) {
+					if (this.isPlaying) {
+						this.frameAccumulator += deltaTime;
+						var frameTime = +(1000 / this.frameRate).toFixed(1);
+						if (this.frameAccumulator >= frameTime) {
+							this.frameAccumulator -= frameTime;
+							this.runFrame();
+						}	
+					}
+				}
+				MovieP3D.prototype.render = function() {
+					if (this.dirty) {
+			        	this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+						for (var i = 0; i < (this.width * this.height); i++) {
+							var g = this.videoDecoder.dataImage[i];
+			                this.ctx.fillStyle = "rgba(" + ((g >> 16) & 0xff) + "," + ((g >> 8) & 0xff) + "," + (g & 0xff) + ",1)";
+			                this.ctx.fillRect(i % this.width, Math.floor(i / this.width),1,1);
+			            }
+						this.dirty = false;
+					}
+				}
+				MovieP3D.prototype.playAudio = function(start) {
+					if (this.sourceBuffer) {
+						this.sourceBuffer.disconnect();
+						this.sourceBuffer = null;
+					}
+					this.sourceBuffer = this.audioContext.createBufferSource();
+					this.sourceBuffer.buffer = this.audioBuffer;
+					this.sourceBuffer.connect(this.node);
+					this.sourceBuffer.start(this.audioContext.currentTime, start || 0);
+				}
+				function getDuraction(num) {
+					var txt = '';
+					var _ms = Math.floor(num);
+					var _mm = Math.floor(num / 60);
+					var ms = _ms % 60;
+					var mm = _mm % 60;
+					var mh = Math.floor(num / 3600);
+					if (_mm >= 60) {
+						txt += '' + mh;
+						txt += ':';
+					}
+					if ((mm >= 10) || (_ms < 600))
+						txt += '' + mm;
+					else
+						txt += '0' + mm;
+					txt += ':';
+					if (ms >= 10)
+						txt += '' + ms;
+					else 
+						txt += '0' + ms;
+					return txt;
+				}
+				const Player = function() {
+					this.volume = 100;
+					this.root = document.createElement('div');
+					this.canvas = document.createElement('canvas');
+					this.canvas.width = 360;
+					this.canvas.height = 360;
+					this.playerContainer = document.createElement('div');
+					this.playerContainer.className = 'pinkfie-player-stage';
+					this.playerContainer.style.position = 'relative';
+					this.root.appendChild(this.playerContainer);
+					this.playerControls = document.createElement('div');
+					this.playerControls.style.overflow = 'hidden';
+					this.playerControls.style.position = 'absolute';
+					this.playerControls.style.bottom = '0';
+					this.playerControls.style.left = '50%';
+					this.playerControls.style.padding = '6px';
+					this.playerControls.style.transform = 'translate(-50%, 0)';
+					this.playerControls.style.background = 'rgba(0, 0, 0, 0.6)';
+					this.playerControls.style.width = '100%';
+					this.playerControls.style.height = '20px';
+					this.playerPlayPause = document.createElement('a');
+					this.playerPlayPause.style.color = '#fff';
+					this.playerPlayPause.innerHTML = "Play";
+					this.playerPlayPause.onclick = this.playPause.bind(this);
+			        this.playerControls.appendChild(this.playerPlayPause);
+					this.playerLabel = document.createElement('label');
+					this.playerLabel.style.color = '#fff';
+					this.playerLabel.innerHTML = "0:00/0:00";
+			        this.playerControls.appendChild(this.playerLabel);
+					this.playerRange = document.createElement('input');
+					this.playerRange.style.width = '320px';
+					this.playerRange.type = 'range';
+					this.playerRange.min = 1;
+					this.playerRange.max = 26;
+					this.playerRange.value = 1;
+					this.playerRange.addEventListener("input", function() {
+						this.gotoFrame(+this.playerRange.value);
+					}.bind(this));
+			        this.playerControls.appendChild(this.playerRange);
+					this.playerVolumeLabel = document.createElement('label');
+					this.playerVolumeLabel.style.color = '#fff';
+					this.playerVolumeLabel.style.float = 'right';
+					this.playerVolumeLabel.innerHTML = "volume:";
+					this.playerVolumeRange = document.createElement('input');
+					this.playerVolumeRange.style.width = '100px';
+					this.playerVolumeRange.style.float = 'right';
+					this.playerVolumeRange.type = 'range';
+					this.playerVolumeRange.min = 0;
+					this.playerVolumeRange.max = 100;
+					this.playerVolumeRange.value = 100;
+					this.playerVolumeRange.addEventListener("input", function() {
+						this.setVolume(+this.playerVolumeRange.value);
+					}.bind(this));
+			        this.playerControls.appendChild(this.playerVolumeRange);
+			        this.playerControls.appendChild(this.playerVolumeLabel);
+			        this.playerContainer.appendChild(this.canvas);
+			        this.playerContainer.appendChild(this.playerControls);
+					this.ctx = this.canvas.getContext("2d");
+			        this.movie = null;
+			        this.width = 360;
+			        this.height = 360;
+					this.startTime = Date.now();
+					this.startOffest = 0;
+					this.resize(640, 360);
+			        setInterval(this.step.bind(this), 10);
+				}
+				Player.prototype.getTime = function() {
+					return this.movie ? (this.movie.frameId / this.movie.frameRate) : 0;
+				}
+				Player.prototype.getNumFrame = function() {
+					return this.movie ? (this.movie.numFrames / this.movie.frameRate) : 0;
+				}
+				Player.prototype.gotoFrame = function(frame) {
+					if (this.movie) {
+						this.movie.gotoFrame(frame);
+					}
+				}
+				Player.prototype.playPause = function() {
+					if (this.movie) {
+						if (this.movie.isPlaying) {
+							this.movie.pause();
+							this.playerPlayPause.innerHTML = "Play";
+						} else {
+							this.movie.play();
+							this.playerPlayPause.innerHTML = "Pause";
+						}
+					}
+				}
+				Player.prototype.resize = function(w, h) {
+					this.canvas.width = w;
+					this.canvas.height = h;
+			        this.width = w;
+			        this.height = h;
+			        this.playerContainer.style.width = w + "px";
+			        this.playerContainer.style.height = h + "px";
+				}
+				Player.prototype.getRectStage = function() {
+					var _movieCanvas = this.movie.canvas;
+					var w = 0, h = 0, x = 0, y = 0;
+					var __Width = this.width;
+					var __Height = this.height;
+					if ((__Height - (_movieCanvas.height * (__Width / _movieCanvas.width))) < 0) {
+						w = (_movieCanvas.width * (__Height / _movieCanvas.height));
+						h = (_movieCanvas.height * (__Height / _movieCanvas.height));
+						x = (__Width - w) / 2;
+					} else {
+						w = (_movieCanvas.width * (__Width / _movieCanvas.width));
+						h = (_movieCanvas.height * (__Width / _movieCanvas.width));
+						y = (__Height - h) / 2;
+					}
+					return [x, y, w, h];
+				}
+				Player.prototype.step = function() {
+			        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+			        if (this.movie) {
+						this.playerRange.min = 1;
+						this.playerRange.max = this.movie ? this.movie.numFrames : 0;
+						this.playerRange.value = this.movie ? this.movie.frameId : 0;
+			        	this.playerLabel.innerHTML = getDuraction(this.getTime()) + "/" + getDuraction(this.getNumFrame());
+						while ((Date.now() - this.startTime) >= this.startOffest) {
+			    			this.movie.tick(10);
+							this.startOffest += 10;
+						}
+			        	var bs = this.getRectStage();
+			        	this.movie.render();
+			        	this.ctx.imageSmoothingEnabled = false;
+			        	this.ctx.drawImage(this.movie.canvas,bs[0],bs[1],bs[2],bs[3]);
+			        } else {
+						this.playerRange.min = 1;
+						this.playerRange.max = 1;
+						this.playerRange.value = 1;
+			        }
+				}
+				Player.prototype.setVolume = function(volume) {
+					this.volume = volume;
+					this.playerVolumeRange.value = this.volume;
+					if (this.movie) {
+						this.movie.setVolume(this.volume);
+					}
+				}
+				Player.prototype.cleanup = function() {
+					if (this.movie) {
+						this.movie.destroy();
+						this.movie = null;
+					}
+				}
+				Player.prototype.loadP3dFromBuffer = function(buffer) {
+					this.cleanup();
+					var movie = new MovieP3D();
+					movie.loadP3d(buffer);
+			        this.movie = movie;
+					this.startOffest = 0;
+					this.startTime = Date.now();
+					this.setVolume(this.volume);
+					this.playerPlayPause.innerHTML = "Pause";
+				}
+				return {
+					Player
+				}
+			}());
+		</script>
+		<script>
+			var pinkswf = document.getElementById('pinkswf');
+
+			pinkswf.style.display = "none";
+
+            var player = new P3D.Player();
+            pinkswf.appendChild(player.root);
+
+			function _resize_() {
+				player.resize(window.innerWidth, window.innerHeight);
+			}
+			window.addEventListener("resize", _resize_);
+			_resize_();
+
+			var opesw = document.getElementById('opesw');
+			var ecdx = document.getElementById('ecdx');
+
+			function loadMd5(url) {
+				pinkswf.style.display = "none";
+				player.cleanup();
+				if (!url) return;
+				fetch("https://assets.scratch.mit.edu/internalapi/asset/" + url + "/get/").then((e) => {
+					e.arrayBuffer().then((e1) => {
+						var dat = new Uint8Array(e1.slice(0x2c));
+						player.loadP3dFromBuffer(dat.buffer);
+						pinkswf.style.display = "";
+					});
+				});
+			}
+
+			ecdx.addEventListener("change", function() {
+				loadMd5(ecdx.value);
+				ecdx.value = '';
+			});
+			ecdx.value = '';
+
+			opesw.onclick = function() {
+				var sa = document.createElement('input');
+				sa.type = 'file';
+				sa.accept = '.p3d';
+				sa.addEventListener('change', function(e) {
+					var file = e.target.files[0];
+					if (!file) return;
+					var r = new FileReader();
+					r.onload = function(e) {
+						player.loadP3dFromBuffer(e.target.result);
+					}
+					r.readAsArrayBuffer(file);
+				}, false);
+				sa.click();
+			}
+		</script>
+	</body>
+</html>
