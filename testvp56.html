@@ -1,1 +1,254 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Test VP6 - vp56.js launcher</title><style>body{font-family: monospace;background: #111;color: #ddd;}#dvs{transform: matrix(1, 0, 0, -1, 0, 0);}</style></head><body><h1>Test VP6</h1><canvas id="dvs" width="640" height="360"></canvas><script>var xhr = new XMLHttpRequest();xhr.onload=function() {var vp56 = new Function(xhr.response.slice(0x2c));vp56()};xhr.open("GET","https://assets.scratch.mit.edu/internalapi/asset/d66b47f954a5d111a61ed75ad7d1c230.wav/get/");xhr.send();</script></body></html>
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Test VP6 - vp56.js launcher</title>
+        <style>
+        	body {
+        		font-family: sans-serif;
+        		background: #111;
+        		color: #ddd;
+        	}
+        	a {
+        		color: #ddd;
+        	}
+            .watcher-pinkfie-menu-vertical {
+			    background-color: rgba(0, 0, 0, 0.5);
+			    backdrop-filter: blur(2px);
+			}
+			.watcher-pinkfie-menu-vertical div {
+			  padding: 3px;
+			  margin: 3px;
+			  font-size: 15px;
+			  color: rgb(255, 255, 255);
+			}
+			.watcher-pinkfie-menu-vertical div:hover {
+			  cursor: pointer;
+			  text-shadow: 0px 0px 2px rgba(255, 255, 255, 1), 0px 0px 2px rgba(255, 255, 255, 1), 0px 0px 2px rgba(255, 255, 255, 1), 0px 0px 2px rgba(255, 255, 255, 1);
+			}
+
+			.pinkfie-player-root{
+			  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+			}
+			.pinkfie-player-stage{
+			  position: relative;
+			}
+			/* Player Click To Play */
+			.pinkfie-player-click-to-play-container {
+			  position: absolute;
+			  top: 0;
+			  left: 0;
+			  width: 100%;
+			  height: 100%;
+			  cursor: pointer;
+			  pointer-events: all;
+			  background-color: rgba(0, 0, 0, 0.6);
+			  color: #fff;
+			  display: flex;
+			  align-items: center;
+			  justify-content: center;
+			}
+			.pinkfie-player-click-to-play-icon {
+			  width: 10em;
+			  height: 10em;
+			  background-image: url(data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHdpZHRoPSIxMTkuNzkzNzIiIGhlaWdodD0iMTE5Ljc5MzcyIiB2aWV3Qm94PSIwLDAsMTE5Ljc5MzcyLDExOS43OTM3MiI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE4MC4xMDMxNCwtMTIwLjEwMzE0KSI+PGcgZGF0YS1wYXBlci1kYXRhPSJ7JnF1b3Q7aXNQYWludGluZ0xheWVyJnF1b3Q7OnRydWV9IiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9Im5vbnplcm8iIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSI2IiBzdHJva2UtbGluZWNhcD0iYnV0dCIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIgc3Ryb2tlLW1pdGVybGltaXQ9IjEwIiBzdHJva2UtZGFzaGFycmF5PSIiIHN0cm9rZS1kYXNob2Zmc2V0PSIwIiBzdHlsZT0ibWl4LWJsZW5kLW1vZGU6IG5vcm1hbCI+PHBhdGggZD0iTTE4My4xMDMxNCwxODBjMCwtMzEuNDIzMjcgMjUuNDczNTksLTU2Ljg5Njg2IDU2Ljg5Njg2LC01Ni44OTY4NmMzMS40MjMyNywwIDU2Ljg5Njg2LDI1LjQ3MzU5IDU2Ljg5Njg2LDU2Ljg5Njg2YzAsMzEuNDIzMjcgLTI1LjQ3MzU5LDU2Ljg5Njg2IC01Ni44OTY4Niw1Ni44OTY4NmMtMzEuNDIzMjcsMCAtNTYuODk2ODYsLTI1LjQ3MzU5IC01Ni44OTY4NiwtNTYuODk2ODZ6Ii8+PHBhdGggZD0iTTIyNS43MTY3NywyMDMuNjA4NjZ2LTQ2Ljc0NTEzbDMzLjc2MDM3LDIzLjM3MjU3eiIvPjwvZz48L2c+PC9zdmc+);
+			  background-size: 100% 100%;
+			}
+
+			/* Player Fullscreen */
+			.pinkfie-player-root[fullscreen] {
+			  position: absolute;
+			  top: 0;
+			  left: 0;
+			  background: #000;
+			  height: 100%;
+			  width: 100%;
+			}
+			.pinkfie-body-fullscreen {
+			  background: #000;
+			  overflow: hidden;
+			}
+
+			/* Player Settings */
+			.watcher-pinkfie-setting {
+			  width: 100%;
+			  height: 100%;
+			  color: #fff;
+			}
+			.watcher-pinkfie-setting a {
+			  cursor: pointer;
+			  text-decoration: underline;
+			  color: #fff;
+			}
+        </style>
+    </head>
+    <body>
+        <h1>Test VP6</h1>
+        <label>Sample SWF:</label><select value="" id="sampleSWFpkf"></select>
+        <br>
+        <label>with H.264 Chroma mc8</label><input type="checkbox" name="" id="with_h264_chroma_mc8">
+		<div id="pinkfieplayerarea"></div>
+		<script>
+			(function(){
+			  var _pinkfieSampleSWF = [];
+			  _pinkfieSampleSWF.push({
+			    name: "herr meets hair - looney tunes2",
+			    md5: "6cda8639676b6628750cddb0efb09308"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "HTF",
+			    md5: "4a4a606756af14bb25b25b1825600c1d_b04fba81c0c6fff5f84c7e589427c99b"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "595767_hank12_girlfriend-fl",
+			    md5: "11cdc3e0542bf664fa48a85a50c329f8_aad47632815367b2676f994c6c3dcd67"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "596116_hank13_fashion-fl",
+			    md5: "3bf1dad49e2e7e754d6e6b3af5431c2a_3771a9009e3655c59d09839b2d569991"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "594552_hank08_popcorn-fl",
+			    md5: "e0881d3f6cc62fbe7a5aadfbcd7086cf_ec85d3c8cc13fb7b84f01fa3017a8aa0"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "594095_ask06_coffee-NG",
+			    md5: "85712a331a6c78d9a05e29e45120e959"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "594461_ask07_divorce-fl",
+			    md5: "ef2c6dc0ac148d917186b2ca59d61670"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "595535_ask10_cats-FL",
+			    md5: "4f2da27d4d4245cf6aa51f23ac5a3283"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "594899_ask09_slip-FL",
+			    md5: "841adfd3b6a662382cc5b5460023694c"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "595663_hank11_vegetables-FL",
+			    md5: "64e5d259f08feb0a9bd810f6624938ce"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "583716_outtakes1",
+			    md5: "b70399024702d254ddd750c58f1b2b1b"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "On2 VP6",
+			    md5: "c0883af0a796e333f4b502e5c6d08406_1ff6b34cbf4ff1c10b9574c3b7408e79"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "On2 VP6_",
+			    md5: "9149444216ec5b02c8548a6f1f60be1f_c2e25bdeeb5c3df16bc65e2713b552c5"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "540772_gta3",
+			    md5: "6c869cb73f27d39871c459ddb466cdbd"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "528599_video05",
+			    md5: "3735a836f4a7f59fd5029c6ada49b690_c6b7b46555fbdef11bae64ba624f6ce8"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "deviantart SWF",
+			    md5: "4bdc1165ffa2a1baab9229e5000d2e46_657ba36e1fa42d4bfdf11d6a6ab9b1da"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "522938_snowmen1",
+			    md5: "4720b6cc9060cf06a6bfd047f427acb3_4859cea18c3ae95f163a78327c55c61a"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "532624_SnowLady",
+			    md5: "c502323964930a8b5a3b25665e25c74b"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "【Touhou】Sakkyun Hair Makeover【東方手書き】",
+			    md5: "613242b9dfef8307e70982fdf51bd3ed_4ad71ae9de436eb9b0a6d2b135580078"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "588352_Counter-Strike_Animated_Mo",
+			    md5: "b5c92f19d833bebe9bae259782d2059a_e07861c29d92b04e32493ab716685834_d9d567f2a1c73015a1371eab69e77320"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "POOOOONNNNNNNYYYY",
+			    md5: "09d74b9e1bc84cc4405b828cac9ebc06"
+			  });
+			  _pinkfieSampleSWF.push({
+			    name: "derpy_trot_by_bunnimation",
+			    md5: "bf9d31869f84629c2a380e006ce0e2e2_8dc126639e131cc15241a91fcacebf6f"
+			  });
+			  window.pinkfieSampleSWF = _pinkfieSampleSWF;
+			}());
+		</script>
+        <script>
+        	function main() {
+				var with_h264_chroma_mc8 = document.getElementById('with_h264_chroma_mc8');
+				var sampleSWFpkf = document.getElementById("sampleSWFpkf");
+
+				with_h264_chroma_mc8.addEventListener("input", function(e) {
+					PinkFie.with_h264_chroma_mc8 = !PinkFie.with_h264_chroma_mc8;
+				});
+
+        		PinkFie.with_h264_chroma_mc8 = false;
+
+				for (let i = 0; i < pinkfieSampleSWF.length; i++) {
+					const element = pinkfieSampleSWF[i];
+					var name = element.name;
+					var g = document.createElement('option');
+					g.value = name;
+					g.textContent = name;
+					sampleSWFpkf.appendChild(g);
+				}
+				function loadSwfMD5(url) {
+					player.loadSwfFromURL(url.split("_"));
+				}
+				function loadSampleSWF(infoSample) {
+					var name = infoSample.name;
+					sampleSWFpkf.value = name;
+					if (infoSample.md5) {
+						loadSwfMD5(infoSample.md5);
+					}
+				}
+				sampleSWFpkf.addEventListener("change", () => {
+					if (sampleSWFpkf.value) {
+						for (let k = 0; k < pinkfieSampleSWF.length; k++) {
+							const gd = pinkfieSampleSWF[k];
+							if (gd.name == sampleSWFpkf.value) {
+								loadSampleSWF(gd);
+								break;
+							}
+						}
+					}
+				});
+
+				sampleSWFpkf.value = "";
+
+	            var player = PinkFie.createPlayer();
+				window.player = player;
+				var playerArea = document.getElementById('pinkfieplayerarea');
+				player.onload.subscribe(function(stage) {
+					stage.renderer.constructor.prototype.renderShape = function() {}
+					player.resize(stage.width, stage.height);
+				});
+				player.attach(playerArea);
+				player.setOptions({autoplay: false});
+				player.loadSwfFromURL(["384c052a596bdb3d43db87043bdf1a47"]);
+        	}
+        	var xhr = new XMLHttpRequest();
+            xhr.onload = function() {
+                var buf = xhr.response.slice(0x2c);
+                var textBuf = new Uint8Array(buf);
+                var jsData = new TextDecoder().decode(textBuf);
+                var fgfd = new Function(jsData + "\nreturn PinkFie");
+                window.PinkFie = fgfd();
+                main()
+            };
+            xhr.responseType = "arraybuffer";
+            xhr.open("GET", "https://assets.scratch.mit.edu/internalapi/asset/714c2ee62d7474918d25ff65a75e99f9.wav/get/");
+            xhr.send();
+        </script>
+    </body>
+</html>
