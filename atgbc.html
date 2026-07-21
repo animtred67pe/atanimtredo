@@ -1,0 +1,3352 @@
+<html>
+    <head>
+        <title>GBC.js - EAAQ (2026-7-20)</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {
+                background-color: #000;
+                overflow: hidden;
+                color: #ddd;
+                font-family: monospace;
+            }
+            #player_area {
+                position: absolute;
+            }
+            #menu_gb {
+                background-color: rgba(0, 0, 0, 0.7);
+                border-radius: 10px;
+                position: relative;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 320px;
+                height: 148px;
+            }
+            #gdfdfgdfgdg {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 18px;
+                background-color: #222;
+            }
+            #gdfdfgdfgdg label{
+                cursor: pointer;
+            }
+            #gdfdfgdfgdg label:hover{
+                color: #fff;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="player_area"></div>
+        <canvas id="wavescene" width="256" height="256" style="position: absolute; background-color: rgba(0, 0, 0, 0.2); display: none;"></canvas>
+        <div id="gdfdfgdfgdg">
+            <label style="position: absolute; left: 1; top: 1;" onclick="gbopenrom()">Open .GB</label>
+            <label style="position: absolute; right: 1; top: 1;" id="gb_menu_button">GBC.js</label>
+            <label style="position: absolute; left: 50%; transform: translate(-50%, 0);" id="gbctitle"></label>
+        </div>
+        <div id="gdfdfgdfgdg_atmkb"></div>
+        <div id="menu_gb">
+            <a style="text-align: right; position: absolute; right: 2; cursor: pointer;" onclick="gbmenubtn()">[x]</a>
+            <h3 style="text-align: center; margin: 6px;">GBC.js By EAXDMLPSXF</h3>
+            <button onclick="gdfgdg_save_eram()">Save ERAM</button>
+            <button onclick="gdfgdg_load_eram()">Load ERAM</button>
+            <br>
+            <button onclick="gbopenrom()">Load ROM</button>
+            <input type="text" id="txtgbrom" placeholder="https://..." name="gbcjs_url">
+            <button onclick="gbloadurl()">Load</button>
+            <br>
+            <button id="ddgbc">Download .gbc</button>
+            <button onclick="gdfgdg_reset()">Reset</button>
+            <button onclick="gbfullscreenbtn()">Fullscreen</button>
+            <br>
+            <button id="sbgb_sb">Skip BIOS: OFF</button>
+            <label>Frameskip:</label>
+            <input type="number" min="0" max="8" value="0" id="gb_frameskip_gb">
+            <br>
+            <label>Emulator Speed:</label>
+            <input type="number" min="0.25" max="8" value="1" step="0.05" id="gb_speed_gb">
+            <br>
+            <label>Scale Mode:</label>
+            <select id="gb_scale_gb"><option value="1">Zoom to Fit</option><option value="2">Stretch to Fit</option></select>
+        </div>
+        <script>
+var AT_MobileKB = function(type, root) {
+    this.type = type;
+    this.root = root;
+    this.buttons = [];
+    this.callback = function() {};
+    this.init();
+}
+AT_MobileKB.isMobileOrTablet = function() {
+    if (window) {
+        return ("orientation" in window);
+    }
+    return false;
+}
+AT_MobileKB.prototype.createBtn = function(control) {
+    var d = document.createElement("div");
+    var colorA = "rgba(25, 25, 25, 0.33)";
+    var colorB = "rgba(255, 255, 255, 0.5)";
+    d.style.background = colorA;
+    d.style.border = "2px solid #333";
+    if (control == "right" || control == "left" || control == "up" || control == "down") {
+        d.style.width = "64px";
+        d.style.height = "64px";
+    } else {
+        if (control == "select" || control == "start" || control == "gbc_js") {
+            d.style.width = "40px";
+            d.style.height = "40px";
+        } else {
+            d.style.width = "72px";
+            d.style.height = "72px";
+        }
+    }
+    d.style.borderRadius = "50%";
+    d.style.position = "absolute";
+    var txt = document.createElement("label");
+    txt.style.position = "absolute";
+    txt.style.top = "50%";
+    txt.style.left = "50%";
+    txt.style.transform = "translate(-50%, -50%)";
+    txt.textContent = control;
+    d.appendChild(txt);
+    var _this = this;
+    if (AT_MobileKB.isMobileOrTablet()) {
+        d.ontouchstart = function(e) {
+            d.style.background = colorB;
+            _this.callback(control, true);
+            e.preventDefault();
+        }
+        d.ontouchend = function(e) {
+            _this.callback(control, false);
+            d.style.background = colorA;
+        }
+    } else {
+        d.onmousedown = function(e) {
+            d.style.background = colorB;
+            _this.callback(control, true);
+            e.preventDefault();
+        }
+        d.onmouseup = function(e) {
+            d.style.background = colorA;
+            _this.callback(control, false);
+            e.preventDefault();
+        }
+    }
+    this.buttons.push([d, control]);
+    this.root.appendChild(d);
+    return d;
+}
+AT_MobileKB.prototype.init = function() {
+    var left = this.createBtn("left");
+    var right = this.createBtn("right");
+    var up = this.createBtn("up");
+    var down = this.createBtn("down");
+    left.style.bottom = "90px";
+    left.style.left = "40px";
+    right.style.bottom = "90px";
+    right.style.left = "140px";
+    down.style.bottom = "40px";
+    down.style.left = "90px";
+    up.style.bottom = "140px";
+    up.style.left = "90px";
+    var select = this.createBtn("select");
+    select.style.bottom = "20px";
+    select.style.left = "180px";
+    var start = this.createBtn("start");
+    start.style.bottom = "20px";
+    start.style.right = "180px";
+    var a = this.createBtn("A");
+    a.style.bottom = "108px";
+    a.style.right = "40px";
+    var b = this.createBtn("B");
+    b.style.bottom = "48px";
+    b.style.right = "95px";
+    var m = this.createBtn("gbc_js");
+    m.style.bottom = "12px";
+    m.style.right = "12px";
+}
+        </script>
+        <script>
+/*
+ * GameBoy Color Emulator By DCPU-16
+ * 
+ * Modified By EAXDMLPFSXFF
+ */
+
+var TimerMods = [64, 1, 4, 16];
+var RAMSizes = [0, 2048, 8196, 32784, 0, 8196, 32784, 131072];
+var GB_BIOS = [0x31, 0xFE, 0xFF, 0x21, 0x00, 0x80, 0xAF, 0x22, 0xCB, 0x6C, 0x28, 0xFB, 0x3E, 0x80, 0xE0, 0x26, 0xE0, 0x11, 0x3E, 0xF3, 0xE0, 0x12, 0xE0, 0x25, 0x3E, 0x77, 0xE0, 0x24, 0x3E, 0x54, 0xE0, 0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0x47, 0xCD, 0xA3, 0x00, 0xCD, 0xA3, 0x00, 0x13, 0x7B, 0xEE, 0x34, 0x20, 0xF2, 0x11, 0xD2, 0x00, 0x0E, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x0D, 0x20, 0xF9, 0x3E, 0x19, 0xEA, 0x10, 0x99, 0x21, 0x2F, 0x99, 0x0E, 0x0C, 0x3D, 0x28, 0x08, 0x32, 0x0D, 0x20, 0xF9, 0x2E, 0x0F, 0x18, 0xF5, 0x3E, 0x1E, 0xE0, 0x42, 0x3E, 0x91, 0xE0, 0x40, 0x16, 0x89, 0x0E, 0x0F, 0xCD, 0xB8, 0x00, 0x7A, 0xCB, 0x2F, 0xCB, 0x2F, 0xE0, 0x42, 0x7A, 0x81, 0x57, 0x79, 0xFE, 0x08, 0x20, 0x04, 0x3E, 0xA8, 0xE0, 0x47, 0x0D, 0x20, 0xE7, 0x3E, 0xFC, 0xE0, 0x47, 0x3E, 0x83, 0xCD, 0xCB, 0x00, 0x06, 0x05, 0xCD, 0xC4, 0x00, 0x3E, 0xC1, 0xCD, 0xCB, 0x00, 0x06, 0x3C, 0xCD, 0xC4, 0x00, 0x21, 0xB0, 0x01, 0xE5, 0xF1, 0x21, 0x4D, 0x01, 0x01, 0x13, 0x00, 0x11, 0xD8, 0x00, 0xC3, 0xFE, 0x00, 0x3E, 0x04, 0x0E, 0x00, 0xCB, 0x20, 0xF5, 0xCB, 0x11, 0xF1, 0xCB, 0x11, 0x3D, 0x20, 0xF5, 0x79, 0x22, 0x23, 0x22, 0x23, 0xC9, 0xE5, 0x21, 0x0F, 0xFF, 0xCB, 0x86, 0xCB, 0x46, 0x28, 0xFC, 0xE1, 0xC9, 0xCD, 0xB8, 0x00, 0x05, 0x20, 0xFA, 0xC9, 0xE0, 0x13, 0x3E, 0x87, 0xE0, 0x14, 0xC9, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x50];
+var GBC_BIOS = [0x31, 0xFE, 0xFF, 0xCD, 0x26, 0x06, 0x26, 0xFE, 0x0E, 0xA0, 0x22, 0x0D, 0x20, 0xFC, 0x0E, 0x10, 0x21, 0x30, 0xFF, 0x22, 0x2F, 0x0D, 0x20, 0xFB, 0xE0, 0xC1, 0xE0, 0x80, 0x3E, 0x80, 0xE0, 0x26, 0xE0, 0x11, 0x3E, 0xF3, 0xE0, 0x12, 0xE0, 0x25, 0x3E, 0x77, 0xE0, 0x24, 0x3E, 0xFC, 0xE0, 0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0x47, 0xCD, 0xF1, 0x05, 0x13, 0x7B, 0xFE, 0x34, 0x20, 0xF5, 0xCD, 0xAE, 0x06, 0x3E, 0x01, 0xE0, 0x4F, 0xCD, 0x26, 0x06, 0xCD, 0x53, 0x06, 0x06, 0x03, 0x21, 0xC2, 0x98, 0x16, 0x03, 0x3E, 0x08, 0x0E, 0x10, 0xCD, 0x86, 0x00, 0xF5, 0xD6, 0x20, 0xD6, 0x03, 0x30, 0x06, 0xC6, 0x20, 0xCD, 0x86, 0x00, 0x0D, 0xF1, 0x82, 0x0D, 0x20, 0xEB, 0xD6, 0x2C, 0xD5, 0x11, 0x10, 0x00, 0x19, 0xD1, 0x05, 0x20, 0xDE, 0x15, 0x28, 0x17, 0x15, 0x3E, 0x38, 0x2E, 0xA7, 0x01, 0x07, 0x01, 0x18, 0xD3, 0xF5, 0x3E, 0x01, 0xE0, 0x4F, 0x36, 0x08, 0xAF, 0xE0, 0x4F, 0xF1, 0x22, 0xC9, 0x11, 0xE1, 0x05, 0x0E, 0x08, 0x21, 0x81, 0xFF, 0xAF, 0x2F, 0x22, 0x22, 0x1A, 0x1C, 0xF6, 0x20, 0x47, 0x1A, 0x1D, 0xF6, 0x84, 0x1F, 0xCB, 0x18, 0x70, 0x2C, 0x22, 0xAF, 0x22, 0x22, 0x1A, 0x1C, 0x22, 0x1A, 0x1C, 0x22, 0xAF, 0x0D, 0x20, 0xE1, 0xCD, 0x1A, 0x08, 0x3E, 0x91, 0xE0, 0x40, 0xCD, 0xBB, 0x06, 0x3E, 0x30, 0xE0, 0xC2, 0x06, 0x04, 0xCD, 0x15, 0x06, 0x3E, 0x83, 0xCD, 0x1F, 0x06, 0x06, 0x05, 0xCD, 0x15, 0x06, 0x3E, 0xC1, 0xCD, 0x1F, 0x06, 0xCD, 0x41, 0x08, 0xCD, 0x09, 0x06, 0x21, 0xC2, 0xFF, 0x35, 0x20, 0xF4, 0xCD, 0xE4, 0x06, 0x18, 0x10, 0xD0, 0x00, 0x98, 0xA0, 0x12, 0xD0, 0x00, 0x80, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0x16, 0x36, 0xD1, 0xDB, 0xF2, 0x3C, 0x8C, 0x92, 0x3D, 0x5C, 0x58, 0xC9, 0x3E, 0x70, 0x1D, 0x59, 0x69, 0x19, 0x35, 0xA8, 0x14, 0xAA, 0x75, 0x95, 0x99, 0x34, 0x6F, 0x15, 0xFF, 0x97, 0x4B, 0x90, 0x17, 0x10, 0x39, 0xF7, 0xF6, 0xA2, 0x49, 0x4E, 0x43, 0x68, 0xE0, 0x8B, 0xF0, 0xCE, 0x0C, 0x29, 0xE8, 0xB7, 0x86, 0x9A, 0x52, 0x01, 0x9D, 0x71, 0x9C, 0xBD, 0x5D, 0x6D, 0x67, 0x3F, 0x6B, 0xB3, 0x46, 0x28, 0xA5, 0xC6, 0xD3, 0x27, 0x61, 0x18, 0x66, 0x6A, 0xBF, 0x0D, 0xF4, 0xB3, 0x46, 0x28, 0xA5, 0xC6, 0xD3, 0x27, 0x61, 0x18, 0x66, 0x6A, 0xBF, 0x0D, 0xF4, 0xB3, 0x00, 0x04, 0x05, 0x23, 0x22, 0x03, 0x1F, 0x0F, 0x0A, 0x05, 0x13, 0x24, 0x87, 0x25, 0x1E, 0x2C, 0x15, 0x20, 0x1F, 0x14, 0x05, 0x21, 0x0D, 0x0E, 0x05, 0x1D, 0x05, 0x12, 0x09, 0x03, 0x02, 0x1A, 0x19, 0x19, 0x29, 0x2A, 0x1A, 0x2D, 0x2A, 0x2D, 0x24, 0x26, 0x9A, 0x2A, 0x1E, 0x29, 0x22, 0x22, 0x05, 0x2A, 0x06, 0x05, 0x21, 0x19, 0x2A, 0x2A, 0x28, 0x02, 0x10, 0x19, 0x2A, 0x2A, 0x05, 0x00, 0x27, 0x24, 0x16, 0x19, 0x06, 0x20, 0x0C, 0x24, 0x0B, 0x27, 0x12, 0x27, 0x18, 0x1F, 0x32, 0x11, 0x2E, 0x06, 0x1B, 0x00, 0x2F, 0x29, 0x29, 0x00, 0x00, 0x13, 0x22, 0x17, 0x12, 0x1D, 0x42, 0x45, 0x46, 0x41, 0x41, 0x52, 0x42, 0x45, 0x4B, 0x45, 0x4B, 0x20, 0x52, 0x2D, 0x55, 0x52, 0x41, 0x52, 0x20, 0x49, 0x4E, 0x41, 0x49, 0x4C, 0x49, 0x43, 0x45, 0x20, 0x52, 0x20, 0x20, 0xE8, 0x90, 0x90, 0x90, 0xA0, 0xA0, 0xA0, 0xC0, 0xC0, 0xC0, 0x48, 0x48, 0x48, 0x00, 0x00, 0x00, 0xD8, 0xD8, 0xD8, 0x28, 0x28, 0x28, 0x60, 0x60, 0x60, 0xD0, 0xD0, 0xD0, 0x80, 0x40, 0x40, 0x20, 0xE0, 0xE0, 0x20, 0x10, 0x10, 0x18, 0x20, 0x20, 0x20, 0xE8, 0xE8, 0xE0, 0x20, 0xE0, 0x10, 0x88, 0x10, 0x80, 0x80, 0x40, 0x20, 0x20, 0x38, 0x20, 0x20, 0x90, 0x20, 0x20, 0xA0, 0x98, 0x98, 0x48, 0x1E, 0x1E, 0x58, 0x88, 0x88, 0x10, 0x20, 0x20, 0x10, 0x20, 0x20, 0x18, 0xE0, 0xE0, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x08, 0x90, 0xB0, 0x90, 0xA0, 0xB0, 0xA0, 0xC0, 0xB0, 0xC0, 0x80, 0xB0, 0x40, 0x88, 0x20, 0x68, 0xDE, 0x00, 0x70, 0xDE, 0x20, 0x78, 0x98, 0xB6, 0x48, 0x80, 0xE0, 0x50, 0x20, 0xB8, 0xE0, 0x88, 0xB0, 0x10, 0x20, 0x00, 0x10, 0x20, 0xE0, 0x18, 0xE0, 0x18, 0x00, 0x18, 0xE0, 0x20, 0xA8, 0xE0, 0x20, 0x18, 0xE0, 0x00, 0xC8, 0x18, 0xE0, 0x00, 0xE0, 0x40, 0x20, 0x18, 0xE0, 0xE0, 0x18, 0x30, 0x20, 0xE0, 0xE8, 0xF0, 0xF0, 0xF0, 0xF8, 0xF8, 0xF8, 0xE0, 0x20, 0x08, 0x00, 0x00, 0x10, 0xFF, 0x7F, 0xBF, 0x32, 0xD0, 0x00, 0x00, 0x00, 0x9F, 0x63, 0x79, 0x42, 0xB0, 0x15, 0xCB, 0x04, 0xFF, 0x7F, 0x31, 0x6E, 0x4A, 0x45, 0x00, 0x00, 0xFF, 0x7F, 0xEF, 0x1B, 0x00, 0x02, 0x00, 0x00, 0xFF, 0x7F, 0x1F, 0x42, 0xF2, 0x1C, 0x00, 0x00, 0xFF, 0x7F, 0x94, 0x52, 0x4A, 0x29, 0x00, 0x00, 0xFF, 0x7F, 0xFF, 0x03, 0x2F, 0x01, 0x00, 0x00, 0xFF, 0x7F, 0xEF, 0x03, 0xD6, 0x01, 0x00, 0x00, 0xFF, 0x7F, 0xB5, 0x42, 0xC8, 0x3D, 0x00, 0x00, 0x74, 0x7E, 0xFF, 0x03, 0x80, 0x01, 0x00, 0x00, 0xFF, 0x67, 0xAC, 0x77, 0x13, 0x1A, 0x6B, 0x2D, 0xD6, 0x7E, 0xFF, 0x4B, 0x75, 0x21, 0x00, 0x00, 0xFF, 0x53, 0x5F, 0x4A, 0x52, 0x7E, 0x00, 0x00, 0xFF, 0x4F, 0xD2, 0x7E, 0x4C, 0x3A, 0xE0, 0x1C, 0xED, 0x03, 0xFF, 0x7F, 0x5F, 0x25, 0x00, 0x00, 0x6A, 0x03, 0x1F, 0x02, 0xFF, 0x03, 0xFF, 0x7F, 0xFF, 0x7F, 0xDF, 0x01, 0x12, 0x01, 0x00, 0x00, 0x1F, 0x23, 0x5F, 0x03, 0xF2, 0x00, 0x09, 0x00, 0xFF, 0x7F, 0xEA, 0x03, 0x1F, 0x01, 0x00, 0x00, 0x9F, 0x29, 0x1A, 0x00, 0x0C, 0x00, 0x00, 0x00, 0xFF, 0x7F, 0x7F, 0x02, 0x1F, 0x00, 0x00, 0x00, 0xFF, 0x7F, 0xE0, 0x03, 0x06, 0x02, 0x20, 0x01, 0xFF, 0x7F, 0xEB, 0x7E, 0x1F, 0x00, 0x00, 0x7C, 0xFF, 0x7F, 0xFF, 0x3F, 0x00, 0x7E, 0x1F, 0x00, 0xFF, 0x7F, 0xFF, 0x03, 0x1F, 0x00, 0x00, 0x00, 0xFF, 0x03, 0x1F, 0x00, 0x0C, 0x00, 0x00, 0x00, 0xFF, 0x7F, 0x3F, 0x03, 0x93, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x7F, 0x03, 0xFF, 0x7F, 0xFF, 0x7F, 0x8C, 0x7E, 0x00, 0x7C, 0x00, 0x00, 0xFF, 0x7F, 0xEF, 0x1B, 0x80, 0x61, 0x00, 0x00, 0xFF, 0x7F, 0xEA, 0x7F, 0x5F, 0x7D, 0x00, 0x00, 0x78, 0x47, 0x90, 0x32, 0x87, 0x1D, 0x61, 0x08, 0x03, 0x90, 0x0F, 0x18, 0x00, 0x78, 0x81, 0x09, 0x12, 0x15, 0x54, 0x93, 0x99, 0x9C, 0x9F, 0xA2, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C, 0x33, 0x00, 0x03, 0x1C, 0x0F, 0x1F, 0x7B, 0x1C, 0x3E, 0x3C, 0xFD, 0xB6, 0xF7, 0xF7, 0x71, 0x01, 0x7F, 0xFC, 0x30, 0xC0, 0x7F, 0x78, 0xFF, 0xFD, 0xDD, 0xCF, 0x00, 0x23, 0x60, 0xFC, 0x6F, 0xD4, 0xBC, 0x35, 0x08, 0xFF, 0xC8, 0x80, 0xF0, 0x53, 0xF8, 0x6A, 0xDF, 0x7C, 0x3D, 0x81, 0x7D, 0x79, 0x3C, 0xF3, 0x43, 0xE7, 0x0F, 0xC7, 0x00, 0xFC, 0x01, 0xD2, 0xB4, 0xAD, 0x2B, 0x41, 0x0E, 0x34, 0x13, 0x1C, 0x41, 0x38, 0x31, 0xFF, 0xEF, 0xF3, 0xE0, 0x5F, 0xD7, 0xD7, 0xFF, 0x3F, 0xE0, 0xF6, 0xAF, 0xDA, 0x9F, 0xFD, 0xA9, 0xE8, 0xFC, 0xDA, 0xBC, 0x3E, 0x7D, 0xA9, 0xE8, 0x00, 0xFF, 0xCF, 0x1F, 0xFF, 0xFD, 0x28, 0x1D, 0x80, 0x1C, 0x3D, 0x3C, 0xFF, 0xF4, 0x2A, 0x38, 0xA9, 0x3F, 0xFF, 0x40, 0x70, 0x00, 0xFF, 0xC5, 0xC0, 0xBF, 0xF6, 0xAA, 0xCF, 0xE1, 0xD2, 0x00, 0xF3, 0xE3, 0xF7, 0xF3, 0xB4, 0x27, 0x77, 0x5F, 0xF5, 0xFC, 0x38, 0x48, 0x00, 0xFF, 0xC7, 0x3F, 0xB4, 0xAD, 0x28, 0xEF, 0xAF, 0xC4, 0xCF, 0x20, 0xCE, 0x8E, 0x9F, 0x90, 0x1E, 0xFF, 0xFF, 0x42, 0x1C, 0xA9, 0x33, 0x00, 0xFF, 0x09, 0x9F, 0x8F, 0xE2, 0x1F, 0x5F, 0xFD, 0x48, 0x3E, 0x3F, 0xA7, 0xBF, 0xCF, 0x3C, 0x42, 0x38, 0xA8, 0x7F, 0xAF, 0xFC, 0x00, 0xFF, 0xCF, 0xFF, 0xFF, 0x3F, 0x00, 0xFF, 0xCA, 0xFE, 0xFF, 0xD4, 0x00, 0xFF, 0xFF, 0x2B, 0xFE, 0xFD, 0x4F, 0x00, 0xFC, 0xFC, 0x53, 0xFF, 0xFC, 0x0F, 0xF7, 0xFD, 0x30, 0xFF, 0x1E, 0x3D, 0xFC, 0x45, 0xFF, 0x87, 0x1F, 0xF7, 0xBF, 0x03, 0xFF, 0x3F, 0xFE, 0x5D, 0x54, 0x00, 0xFF, 0xFC, 0x01, 0xC0, 0x83, 0x03, 0x87, 0xD3, 0x4F, 0x54, 0x8F, 0x3C, 0xD2, 0xAA, 0x2A, 0xFC, 0x06, 0xBE, 0x3E, 0xDF, 0xDF, 0xDD, 0xCF, 0x00, 0xC8, 0x0E, 0xFF, 0x7B, 0xFC, 0xF3, 0x15, 0xC0, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xF1, 0x03, 0xC2, 0xFF, 0x87, 0xFF, 0x50, 0xF8, 0x00, 0xFF, 0x03, 0xC7, 0x83, 0xE3, 0x61, 0xF1, 0xB6, 0x53, 0x7C, 0xDF, 0xDA, 0xAF, 0xF4, 0xA5, 0x4A, 0xD7, 0xD7, 0x55, 0xD7, 0xFF, 0xF1, 0xE0, 0x6F, 0xDB, 0xF0, 0xF9, 0xF1, 0x00, 0xFB, 0xF9, 0x7F, 0x7B, 0xB7, 0xFF, 0x3F, 0x1E, 0xD0, 0x1C, 0xAA, 0xA4, 0xFF, 0xCF, 0x00, 0xFC, 0x3F, 0x13, 0x1E, 0x31, 0x7C, 0xF8, 0xE5, 0xF5, 0xF5, 0xD7, 0xD7, 0x01, 0xFF, 0x7F, 0x4F, 0x77, 0xC7, 0x22, 0x9F, 0x03, 0x7D, 0x01, 0x1D, 0x24, 0x38, 0x6D, 0x00, 0x55, 0xCD, 0xF4, 0x05, 0x3E, 0x04, 0x0E, 0x00, 0xCB, 0x20, 0xF5, 0xCB, 0x11, 0xF1, 0xCB, 0x11, 0x3D, 0x20, 0xF5, 0x79, 0x22, 0x23, 0x22, 0x23, 0xC9, 0xE5, 0x21, 0x0F, 0xFF, 0xCB, 0x86, 0xCB, 0x46, 0x28, 0xFC, 0xE1, 0xC9, 0xCD, 0x41, 0x08, 0xCD, 0x09, 0x06, 0x05, 0x20, 0xF7, 0xC9, 0xE0, 0x13, 0x3E, 0x87, 0xE0, 0x14, 0xC9, 0x21, 0x00, 0x80, 0xAF, 0x22, 0xCB, 0x6C, 0x28, 0xFA, 0xC9, 0xCD, 0x33, 0x06, 0x1A, 0xA1, 0x47, 0x1C, 0x1C, 0x1A, 0x1D, 0x1D, 0xA1, 0xCB, 0x37, 0xB0, 0xCB, 0x41, 0x28, 0x02, 0xCB, 0x37, 0x23, 0x22, 0xCB, 0x31, 0xC9, 0xCD, 0x4D, 0x06, 0xCD, 0x30, 0x06, 0x1C, 0x7B, 0xC9, 0x21, 0x96, 0x04, 0x11, 0x7F, 0x80, 0x0E, 0x30, 0x46, 0x05, 0x28, 0x36, 0x04, 0x23, 0x37, 0xCB, 0x10, 0x38, 0x20, 0xCB, 0x20, 0x38, 0x03, 0x2A, 0x18, 0x20, 0xCB, 0x20, 0x20, 0x05, 0x46, 0x23, 0x37, 0xCB, 0x10, 0x4F, 0x30, 0x03, 0xCB, 0x3F, 0xFE, 0x87, 0xCB, 0x20, 0x38, 0x02, 0xB1, 0xFE, 0xA1, 0x18, 0x07, 0xCB, 0x20, 0x38, 0x03, 0x1B, 0x1A, 0x13, 0x13, 0x12, 0xCB, 0x20, 0x20, 0xD1, 0x18, 0xC6, 0x62, 0x2E, 0x80, 0x11, 0x04, 0x01, 0x0E, 0xF0, 0xCD, 0x4A, 0x06, 0xC6, 0x16, 0x5F, 0xCD, 0x4A, 0x06, 0xD6, 0x16, 0x5F, 0xFE, 0x1C, 0x20, 0xEE, 0x23, 0x11, 0x8E, 0x04, 0x0E, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x0D, 0x20, 0xF9, 0xC9, 0x3E, 0x01, 0xE0, 0x4F, 0x16, 0x1A, 0x06, 0x02, 0xCD, 0x15, 0x06, 0x21, 0xC0, 0x98, 0x0E, 0x03, 0x7E, 0xFE, 0x0F, 0x28, 0x05, 0x34, 0xE6, 0x07, 0x28, 0x03, 0x23, 0x18, 0xF3, 0x7D, 0xF6, 0x1F, 0x6F, 0x23, 0x0D, 0x20, 0xEB, 0x15, 0x20, 0xDE, 0xC9, 0x06, 0x20, 0x0E, 0x20, 0x21, 0x81, 0xFF, 0xC5, 0x2A, 0x5F, 0x3A, 0x57, 0x01, 0x21, 0x04, 0x7B, 0xE6, 0x1F, 0xFE, 0x1F, 0x20, 0x01, 0x0D, 0x7B, 0xFE, 0xE0, 0x38, 0x09, 0x7A, 0xE6, 0x03, 0xFE, 0x03, 0x20, 0x02, 0xCB, 0xA9, 0x7A, 0xE6, 0x7C, 0xFE, 0x7C, 0x20, 0x02, 0xCB, 0x90, 0x7B, 0x81, 0x22, 0x7A, 0x88, 0x22, 0xC1, 0x0D, 0x20, 0xCF, 0xCD, 0x09, 0x06, 0xCD, 0x1A, 0x08, 0xCD, 0x09, 0x06, 0x05, 0x20, 0xBE, 0x3E, 0x02, 0xE0, 0x70, 0x21, 0x00, 0xD0, 0xCD, 0x29, 0x06, 0x3C, 0xCD, 0x2E, 0x08, 0xCD, 0x33, 0x08, 0xCD, 0x2E, 0x08, 0xAF, 0xE0, 0x70, 0x2F, 0xE0, 0x00, 0x57, 0x59, 0x2E, 0x0D, 0xFA, 0x43, 0x01, 0xCB, 0x7F, 0xCC, 0x73, 0x07, 0xCB, 0x7F, 0xE0, 0x4C, 0xF0, 0x80, 0x47, 0x28, 0x05, 0xF0, 0xC1, 0xA7, 0x20, 0x06, 0xAF, 0x4F, 0x3E, 0x11, 0x61, 0xC9, 0xCD, 0x73, 0x07, 0xE0, 0x4C, 0x3E, 0x01, 0xC9, 0x21, 0x7D, 0x04, 0x4F, 0x06, 0x00, 0x09, 0x7E, 0xC9, 0x3E, 0x01, 0xE0, 0x6C, 0xCD, 0x9E, 0x07, 0xCB, 0x7F, 0xC4, 0xE1, 0x08, 0xCB, 0xBF, 0x47, 0x80, 0x80, 0x47, 0xF0, 0xC1, 0xA7, 0x28, 0x05, 0xCD, 0x6A, 0x07, 0x18, 0x01, 0x78, 0xCD, 0x09, 0x06, 0xCD, 0xF5, 0x07, 0x3E, 0x04, 0x11, 0x08, 0x00, 0x2E, 0x7C, 0xC9, 0x21, 0x4B, 0x01, 0x7E, 0xFE, 0x33, 0x28, 0x05, 0x3D, 0x20, 0x42, 0x18, 0x0C, 0x2E, 0x44, 0x2A, 0xFE, 0x30, 0x20, 0x39, 0x7E, 0xFE, 0x31, 0x20, 0x34, 0x2E, 0x34, 0x0E, 0x10, 0xAF, 0x86, 0x2C, 0x0D, 0x20, 0xFB, 0xE0, 0x80, 0x47, 0x21, 0x00, 0x02, 0x7D, 0xD6, 0x5E, 0xC8, 0x2A, 0xB8, 0x20, 0xF8, 0x7D, 0xD6, 0x42, 0x38, 0x0E, 0xE5, 0x7D, 0xC6, 0x7A, 0x6F, 0x7E, 0xE1, 0x4F, 0xFA, 0x37, 0x01, 0xB9, 0x20, 0xE5, 0x7D, 0xC6, 0x5D, 0x6F, 0x78, 0xE0, 0x80, 0x7E, 0xC9, 0xAF, 0xC9, 0x21, 0xD9, 0x02, 0x06, 0x00, 0x4F, 0x09, 0xC9, 0xCD, 0xED, 0x07, 0x1E, 0x00, 0x2A, 0xE5, 0x21, 0x7E, 0x03, 0x4F, 0x09, 0x16, 0x08, 0x0E, 0x6A, 0xCD, 0x23, 0x08, 0xE1, 0xCB, 0x5B, 0x20, 0x04, 0x1E, 0x08, 0x18, 0xE9, 0x4E, 0x21, 0x7E, 0x03, 0x09, 0x16, 0x08, 0x18, 0x05, 0x21, 0x81, 0xFF, 0x16, 0x40, 0x1E, 0x00, 0x0E, 0x68, 0x3E, 0x80, 0xB3, 0xE2, 0x0C, 0x2A, 0xE2, 0x15, 0x20, 0xFB, 0xC9, 0xE0, 0x4F, 0x21, 0xEE, 0x00, 0xCD, 0x09, 0x06, 0x0E, 0x51, 0x06, 0x05, 0x2A, 0xE2, 0x0C, 0x05, 0x20, 0xFA, 0xC9, 0x3E, 0x20, 0xE0, 0x00, 0xF0, 0x00, 0x2F, 0xE6, 0x0F, 0xC8, 0x2E, 0x00, 0x2C, 0x1F, 0x30, 0xFC, 0x3E, 0x10, 0xE0, 0x00, 0xF0, 0x00, 0x2F, 0x17, 0x17, 0xE6, 0x0C, 0x85, 0x6F, 0xF0, 0xC1, 0xBD, 0xC8, 0x7D, 0xE0, 0xC1, 0xC5, 0xD5, 0xCD, 0x6A, 0x07, 0xCD, 0xED, 0x07, 0x2C, 0x2C, 0x4E, 0x21, 0x7F, 0x03, 0x09, 0x3A, 0xFE, 0x7F, 0x20, 0x02, 0x23, 0x23, 0xF5, 0x2A, 0xE5, 0x21, 0x81, 0xFF, 0xCD, 0xD7, 0x08, 0x2E, 0x83, 0xCD, 0xD7, 0x08, 0xE1, 0xE0, 0x87, 0x2A, 0xE5, 0x21, 0x82, 0xFF, 0xCD, 0xD7, 0x08, 0x2E, 0x84, 0xCD, 0xD7, 0x08, 0xE1, 0xE0, 0x88, 0xF1, 0x28, 0x02, 0x23, 0x23, 0xF0, 0xBB, 0xE6, 0xDE, 0x47, 0x2A, 0xE6, 0xDE, 0x80, 0x47, 0xFA, 0xBC, 0xFF, 0xCB, 0x97, 0x4E, 0xCB, 0x91, 0x89, 0x1F, 0xEA, 0xBC, 0xFF, 0x78, 0x1F, 0xEA, 0xBB, 0xFF, 0x2D, 0x2A, 0xE0, 0xBF, 0x2A, 0xE0, 0xC0, 0x2A, 0xE0, 0x85, 0x2A, 0xE0, 0x86, 0xCD, 0x09, 0x06, 0xCD, 0x1A, 0x08, 0x3E, 0x30, 0xE0, 0xC2, 0xD1, 0xC1, 0xC9, 0x11, 0x08, 0x00, 0x4B, 0x77, 0x19, 0x0D, 0x20, 0xFB, 0xC9, 0xF5, 0xCD, 0x09, 0x06, 0x3E, 0x19, 0xEA, 0x10, 0x99, 0x21, 0x2F, 0x99, 0x0E, 0x0C, 0x3D, 0x28, 0x08, 0x32, 0x0D, 0x20, 0xF9, 0x2E, 0x0F, 0x18, 0xF5, 0xF1, 0xC9, 0x00, 0x00, 0x00, 0x00];
+var Instruction_ID_Lookup = [30, 1, 16, 14, 11, 12, 0, 25, 17, 26, 16, 15, 11, 12, 0, 25, 30, 1, 16, 14, 11, 12, 0, 25, 9, 26, 16, 15, 11, 12, 0, 25, 9, 1, 16, 14, 11, 12, 0, 13, 9, 26, 16, 15, 11, 12, 0, 13, 9, 10, 16, 14, 11, 12, 0, 13, 9, 26, 16, 15, 11, 12, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 18, 18, 18, 18, 18, 18, 18, 18, 20, 20, 20, 20, 20, 20, 20, 20, 19, 19, 19, 19, 19, 19, 19, 19, 4, 4, 4, 4, 4, 4, 4, 4, 7, 24, 5, 5, 22, 23, 2, 6, 7, 7, 5, 28, 22, 22, 2, 6, 7, 24, 5, 30, 22, 23, 3, 6, 7, 7, 5, 30, 22, 30, 3, 6, 21, 24, 21, 30, 30, 23, 18, 6, 27, 5, 0, 30, 30, 30, 20, 6, 21, 24, 21, 8, 30, 23, 19, 6, 27, 27, 0, 8, 30, 30, 4, 6];
+var OP_Command = ["0", "b2l3l", "P21", "=23", "i2", "d2", "l2l", "{cl", "*SP->addr", "+23", "P12", "-23", "i3", "d3", "l3l", "{cr", "0", "b4l5l", "P41", "=45", "i4", "d4", "l4l", "{nl", "vlx", "+45", "P14", "-45", "i5", "d5", "l5l", "{nr", "vl10", "b6l7l", "P611", "=67", "i6", "d6", "l6l", "_.", "vl11", "+67", "P161", "-67", "i7", "d7", "l7l", "_c", "vl40", "'SPLD", "P612", "=S", "im", "dm", "lml", "_^", "vl41", "+S", "P162", "-S", "i1", "d1", "l1l", "_#", "l22", "l23", "l24", "l25", "l26", "l27", "l2m", "l21", "l32", "l33", "l34", "l35", "l36", "l37", "l3m", "l31", "l42", "l43", "l44", "l45", "l46", "l47", "l4m", "l41", "l52", "l53", "l54", "l55", "l56", "l57", "l5m", "l51", "l62", "l63", "l64", "l65", "l66", "l67", "l6m", "l61", "l72", "l73", "l74", "l75", "l76", "l77", "l7m", "l71", "lm2", "lm3", "lm4", "lm5", "lm6", "lm7", "_HALT", "lm1", "l12", "l13", "l14", "l15", "l16", "l17", "l1m", "l11", "a2", "a3", "a4", "a5", "a6", "a7", "am", "a1", "A2c", "A3c", "A4c", "A5c", "A6c", "A7c", "Amc", "A1c", "s2", "s3", "s4", "s5", "s6", "s7", "sm", "s1", "S2c", "S3c", "S4c", "S5c", "S6c", "S7c", "Smc", "S1c", "&2", "&3", "&4", "&5", "&6", "&7", "&m", "&1", "\\2", "\\3", "\\4", "\\5", "\\6", "\\7", "\\m", "\\1", "|2", "|3", "|4", "|5", "|6", "|7", "|m", "|1", "?2", "?3", "?4", "?5", "?6", "?7", "?m", "?1", "e10", ".2", "jl10", "jl", "Cl10", "^2", "al", "R0", "e11", "et1", "jl11", "z", "Cl11", "Clx", "Alc", "R1", "e40", ".4", "jl40", "0", "Cl40", "^4", "sl", "R2", "e41", "et1i", "jl41", "0", "Cl41", "0", "Slc", "R3", "hl1", ".6", "h31", "0", "0", "^6", "&l", "R4", ";a", "jm", "lh1", "0", "0", "0", "\\l", "R5", "h1l", ".1", "h13", "!0", "0", "^1", "|l", "R6", ";h", ";l", "l1h", "!1", "0", "0", "?l", "R7"];
+var PrefixCBlookup = ["s2cl", "s3cl", "s4cl", "s5cl", "s6cl", "s7cl", "smcl", "s1cl", "s2cr", "s3cr", "s4cr", "s5cr", "s6cr", "s7cr", "smcr", "s1cr", "s2nl", "s3nl", "s4nl", "s5nl", "s6nl", "s7nl", "smnl", "s1nl", "s2nr", "s3nr", "s4nr", "s5nr", "s6nr", "s7nr", "smnr", "s1nr", "s2al", "s3al", "s4al", "s5al", "s6al", "s7al", "smal", "s1al", "s2ar", "s3ar", "s4ar", "s5ar", "s6ar", "s7ar", "smar", "s1ar", "~2", "~3", "~4", "~5", "~6", "~7", "~m", "~1", "s2lr", "s3lr", "s4lr", "s5lr", "s6lr", "s7lr", "smlr", "s1lr", "b02", "b03", "b04", "b05", "b06", "b07", "b0m", "b01", "b12", "b13", "b14", "b15", "b16", "b17", "b1m", "b11", "b22", "b23", "b24", "b25", "b26", "b27", "b2m", "b21", "b32", "b33", "b34", "b35", "b36", "b37", "b3m", "b31", "b42", "b43", "b44", "b45", "b46", "b47", "b4m", "b41", "b52", "b53", "b54", "b55", "b56", "b57", "b5m", "b51", "b62", "b63", "b64", "b65", "b66", "b67", "b6m", "b61", "b72", "b73", "b74", "b75", "b76", "b77", "b7m", "b71", "=020", "=030", "=040", "=050", "=060", "=070", "=0m0", "=010", "=120", "=130", "=140", "=150", "=160", "=170", "=1m0", "=110", "=220", "=230", "=240", "=250", "=260", "=270", "=2m0", "=210", "=320", "=330", "=340", "=350", "=360", "=370", "=3m0", "=310", "=420", "=430", "=440", "=450", "=460", "=470", "=4m0", "=410", "=520", "=530", "=540", "=550", "=560", "=570", "=5m0", "=510", "=620", "=630", "=640", "=650", "=660", "=670", "=6m0", "=610", "=720", "=730", "=740", "=750", "=760", "=770", "=7m0", "=710", "=021", "=031", "=041", "=051", "=061", "=071", "=0m1", "=011", "=121", "=131", "=141", "=151", "=161", "=171", "=1m1", "=111", "=221", "=231", "=241", "=251", "=261", "=271", "=2m1", "=211", "=321", "=331", "=341", "=351", "=361", "=371", "=3m1", "=311", "=421", "=431", "=441", "=451", "=461", "=471", "=4m1", "=411", "=521", "=531", "=541", "=551", "=561", "=571", "=5m1", "=511", "=621", "=631", "=641", "=651", "=661", "=671", "=6m1", "=611", "=721", "=731", "=741", "=751", "=761", "=771", "=7m1", "=711"];
+var ScreenColours = [0xEFFFDE, 0xADD794, 0x529273, 0x183442];
+var MBCTypes = ["0000", "1000", "1100", "1110", "0000", "2000", "2110", "0000", "0100", "0110", "0000", "6000", "6100", "6110", "0000", "3011", "3111", "3000", "3100", "3110", "0000", "4000", "4100", "4110", "0000", "5000", "5100", "5110", "5000", "5100", "5110"];
+var waveVols = [0, 100, 50, 25];
+var BitDivisorTable = [1, 2, 4, 8, 16, 32, 64, 128];
+var NoiseDivisorLookup = [8, 16, 32, 48, 64, 80, 96, 112];
+
+function num_sign(num) {
+  if (num > 0) {
+    return 1;
+  } else if (num < 0) {
+    return -1;
+  } else {
+    return 0;
+  }
+}
+
+function set_array(_in, out) {
+  for (var i = 0; i < _in.length; i++) {
+    out[i] = _in[i];
+  }
+}
+
+var GBCJS = function() {
+  this.SkipBIOS = false;
+  this.Frameskip = 0;
+  this.turbo = false;
+  this.canvas = document.createElement("canvas");
+  this.canvas.width = 160;
+  this.canvas.height = 144;
+  this.ctx = this.canvas.getContext("2d");
+  this.imageData = this.ctx.createImageData(160, 144);
+  this.name = "";
+  this.gameCode = "";
+  this.inbios = 0;
+  this.PC = 0;
+  this.CPUSpeed = 1;
+  this.SP = 0;
+  this.FrameskipCounter = 0;
+  this.AudioFrames = 0;
+  this.Halted = 0;
+  this.enableIterrupts = 0;
+  this.TimerClock = 0;
+  this.TimerDiv = 0;
+  this.LCDState = 0;
+  this.NextLineChange = 0;
+  this.WaveTable = this.getTypedArray(32, "float64");
+  this.iREQ = 0;
+  this.iREQs = this.getTypedArray(32, "int32");
+  this.iFLAGS = 0;
+  this.ZRAM = this.getTypedArray(512, "int32");
+  this.VRAM = this.getTypedArray(0, "float64");
+  this.WRAM = this.getTypedArray(0, "float64");
+  this.ERAM = this.getTypedArray(0, "uint8");
+  this.MBC = this.getTypedArray(8, "float64");
+  this.ROM = this.getTypedArray(0, "uint8");
+  this.Flags = this.getTypedArray(4, "float64");
+  this.Registers = this.getTypedArray(7, "float64");
+  this.LCDStatIns = this.getTypedArray(4, "float64");
+  this.Pallete = this.getTypedArray(4, "float64");
+  this.SpritePal = this.getTypedArray(8, "float64");
+  this.AudioEngine = this.getTypedArray(36, "float64");
+  this.AudioEngineDutyCycle = this.getTypedArray(2, "float64");
+  this.AudioEngineDutyCycle[0] = 2;
+  this.AudioEngineDutyCycle[1] = 2;
+  this.AudioEngineEnables = this.getTypedArray(4, "float64");
+  this.AudioEngineStereoLeft = this.getTypedArray(4, "float64");
+  this.AudioEngineStereoRight = this.getTypedArray(4, "float64");
+  this.NoiseChannelWidthMode = 0;
+  this.CGB = 0;
+  this.CGBBGPalCol = this.getTypedArray(32, "float64");
+  this.CGBSprPalCol = this.getTypedArray(32, "float64");
+  this.CGBBGPalReg = this.getTypedArray(64, "float64");
+  this.CGBSprPalReg = this.getTypedArray(64, "float64");
+  this.CGBDMA = this.getTypedArray(5, "float64");
+  this.Cycles = 0;
+  this.Input = [1, 1, 1, 1, 1, 1, 1, 1];
+  this.oldinput = "11111111";
+  this.LineCycles = 0;
+  this.ScanlineCoincidence = 0;
+  this.Tiles = [];
+  this.audioCycles = 0;
+  this.soundPhase = 0;
+  this.emulatorSpeed = 1;
+  this._ticks = 0;
+}
+GBCJS.prototype.getTypedArray = function(len, type) {
+  var arr = [];
+  for (var i = 0; i < len; i++) {
+    arr[i] = 0;
+  }
+  return arr;
+}
+GBCJS.prototype.fromTypedArray = function(_in) {
+  var arr = [];
+  for (var i = 0; i < _in.length; i++) {
+    arr[i] = _in[i];
+  }
+  return arr;
+}
+GBCJS.prototype.getFrameskip = function() {
+  return this.turbo ? 32 : this.Frameskip;
+}
+GBCJS.prototype.setRom = function(rom) {
+  this.ROM = rom;
+}
+GBCJS.prototype.saveState = function(state) {
+  var _tiles = this.Tiles;
+  var r = [];
+  for (var i = 0; i < _tiles.length; i++) {
+    var t = _tiles[i];
+    r.push({
+      tile: t.tile,
+      len: t.len,
+      p: t.p,
+    });
+  }
+  return [
+    this.ROM,
+    this.name,
+    this.gameCode,
+    this.inbios,
+    this.PC,
+    this.AudioFrames,
+    this.audioCycles,
+    this.soundPhase,
+    this.ScanlineCoincidence,
+    this.SP,
+    this.CPUSpeed,
+    this.Halted,
+    this.enableIterrupts,
+    this.TimerClock,
+    this.TimerDiv,
+    this.LCDState,
+    this.NextLineChange,
+    this.NoiseChannelWidthMode,
+    this.iREQ,
+    this.iFLAGS,
+    this.CGB,
+    this.fromTypedArray(this.WaveTable),
+    this.fromTypedArray(this.Flags),
+    this.fromTypedArray(this.Registers),
+    this.fromTypedArray(this.LCDStatIns),
+    this.fromTypedArray(this.Pallete),
+    this.fromTypedArray(this.SpritePal),
+    this.fromTypedArray(this.AudioEngine),
+    this.fromTypedArray(this.AudioEngineDutyCycle),
+    this.fromTypedArray(this.AudioEngineEnables),
+    this.fromTypedArray(this.AudioEngineStereoLeft),
+    this.fromTypedArray(this.AudioEngineStereoRight),
+    this.fromTypedArray(this.MBC),
+    this.fromTypedArray(this.ERAM),
+    this.fromTypedArray(this.iREQs),
+    this.fromTypedArray(this.ZRAM),
+    r,
+    this.fromTypedArray(this.VRAM),
+    this.fromTypedArray(this.WRAM),
+    this.fromTypedArray(this.CGBBGPalCol),
+    this.fromTypedArray(this.CGBSprPalCol),
+    this.fromTypedArray(this.CGBBGPalReg),
+    this.fromTypedArray(this.CGBSprPalReg),
+    this.fromTypedArray(this.CGBDMA)
+  ]
+}
+GBCJS.prototype.loadState = function(state) {
+    var index = 0;
+  this.ROM = state[index++];
+  this.name = state[index++];
+  this.gameCode = state[index++];
+  this.inbios = state[index++];
+  this.PC = state[index++];
+  this.AudioFrames = state[index++];
+  this.audioCycles = state[index++];
+  this.soundPhase = state[index++];
+  this.ScanlineCoincidence = state[index++];
+  this.SP = state[index++];
+  this.CPUSpeed = state[index++];
+  this.Halted = state[index++];
+  this.enableIterrupts = state[index++];
+  this.TimerClock = state[index++];
+  this.TimerDiv = state[index++];
+  this.LCDState = state[index++];
+  this.NextLineChange = state[index++];
+  this.NoiseChannelWidthMode = state[index++];
+  this.iREQ = state[index++];
+  this.iFLAGS = state[index++];
+  this.CGB = state[index++];
+  set_array(state[index++], this.WaveTable);
+  set_array(state[index++], this.Flags);
+  set_array(state[index++], this.Registers);
+  set_array(state[index++], this.LCDStatIns);
+  set_array(state[index++], this.Pallete);
+  set_array(state[index++], this.SpritePal);
+  set_array(state[index++], this.AudioEngine);
+  set_array(state[index++], this.AudioEngineDutyCycle);
+  set_array(state[index++], this.AudioEngineEnables);
+  set_array(state[index++], this.AudioEngineStereoLeft);
+  set_array(state[index++], this.AudioEngineStereoRight);
+  set_array(state[index++], this.MBC);
+  set_array(state[index++], this.ERAM);
+  set_array(state[index++], this.iREQs);
+  set_array(state[index++], this.ZRAM);
+  var _tiles = state[index++];
+  var r = [];
+  for (var i = 0; i < _tiles.length; i++) {
+    var t = _tiles[i];
+    r.push({
+      tile: t.tile,
+      len: t.len,
+      p: t.p,
+    });
+  }
+  this.Tiles = r;
+  set_array(state[index++], this.VRAM);
+  set_array(state[index++], this.WRAM);
+  set_array(state[index++], this.CGBBGPalCol);
+  set_array(state[index++], this.CGBSprPalCol);
+  set_array(state[index++], this.CGBBGPalReg);
+  set_array(state[index++], this.CGBSprPalReg);
+  set_array(state[index++], this.CGBDMA);
+}
+GBCJS.prototype.initSystem = function() {
+  var imgData = this.imageData.data;
+  for (var i = 0; i < imgData.length; i++) 
+    imgData[i] = 0;
+  this.name = "";
+    for (var index = 0x134; index < 0x13F; index++) {
+        if (this.ROM[index] > 0) {
+            this.name += String.fromCharCode(this.ROM[index]);
+        }
+    }
+  this.gameCode = "";
+    for (var index = 0x13F; index < 0x143; index++) {
+        if (this.ROM[index] > 0) {
+            this.gameCode += String.fromCharCode(this.ROM[index]);
+        }
+    }
+  this.WaveTable = this.getTypedArray(32, "float64");
+  this.AudioFrames = 0;
+  this.audioCycles = 0;
+  this.soundPhase = 0;
+  this.ScanlineCoincidence = 0;
+  if (this.SkipBIOS) {
+    this.inbios = 0;
+    this.PC = 256;
+    this.SP = 0xFFFE;
+  } else {
+    this.inbios = 1;
+    this.PC = 0;
+    this.SP = 0;
+  }
+  this.CPUSpeed = 1;
+  this.FrameskipCounter = 0;
+  this.Halted = 0;
+  this.enableIterrupts = 0;
+  this.TimerClock = 0;
+  this.TimerDiv = 0;
+  this.LCDState = 2;
+  this.NextLineChange = 80;
+  this.Flags = this.getTypedArray(4, "float64");
+  this.Registers = this.getTypedArray(7, "float64");
+  this.LCDStatIns = this.getTypedArray(4, "float64");
+  this.Pallete = this.getTypedArray(4, "float64");
+  this.SpritePal = this.getTypedArray(8, "float64");
+  this.AudioEngine = this.getTypedArray(36, "float64");
+  this.AudioEngineDutyCycle = this.getTypedArray(2, "float64");
+  this.AudioEngineDutyCycle[0] = 2;
+  this.AudioEngineDutyCycle[1] = 2;
+  this.AudioEngineEnables = this.getTypedArray(4, "float64");
+  this.AudioEngineStereoLeft = this.getTypedArray(4, "float64");
+  this.AudioEngineStereoRight = this.getTypedArray(4, "float64");
+  this.NoiseChannelWidthMode = 0;
+  this.MBC = this.getTypedArray(8, "float64");
+  var i = MBCTypes[this.ROM[327] & 255];
+  this.MBC[0] = +i[0];
+  this.MBC[1] = +i[1];
+  this.MBC[2] = +i[2];
+  this.MBC[3] = +i[3];
+  this.MBC[4] = 0;
+  this.MBC[5] = 1;
+  this.MBC[6] = 0;
+  this.MBC[7] = 0;
+  if (this.MBC[0] == 5) {
+    i = (this.ROM[329] & 255);
+    if (i > 3) {
+      i = 3;
+    }
+  } else {
+    i = (this.ROM[329] & 255) + 4;
+    if (i > 7) {
+      i = 7;
+    }
+  }
+  this.ERAM = this.getTypedArray(RAMSizes[i], "uint8");
+  this.iREQ = 0;
+  this.iREQs = this.getTypedArray(32, "float64");
+  this.iFLAGS = 0;
+  this.ZRAM = this.getTypedArray(512, "float64");
+  this.Tiles = [];
+  var isColor = (this.ROM[323] == 0x80) || (this.ROM[323] == 0xC0);
+  if (isColor) {
+    this.CGB = 1;
+    this.VRAM = this.getTypedArray(16384, "float64");
+    this.WRAM = this.getTypedArray(32768, "float64");
+    this.CGBBGPalCol = this.getTypedArray(32, "float64");
+    this.CGBSprPalCol = this.getTypedArray(32, "float64");
+    for (var i = 0; i < 32; i++) {
+      this.CGBBGPalCol[i] = 0xFFFFFF;
+      this.CGBSprPalCol[i] = 0xFFFFFF;
+    }
+    this.CGBBGPalReg = this.getTypedArray(64, "float64");
+    this.CGBSprPalReg = this.getTypedArray(64, "float64");
+    for (var i = 0; i < 64; i += 2) {
+      this.CGBBGPalReg[i] = 255;
+      this.CGBBGPalReg[i + 1] = 127;
+      this.CGBSprPalReg[i] = 255;
+      this.CGBSprPalReg[i + 1] = 127;
+    }
+    for (var i = 0; i < 6272; i++) {
+      this.Tiles.push({
+        tile: "11111111",
+        len: "8",
+        p: "0"
+      });
+    }
+    this.Registers[0] = 17;
+    this.ZRAM[368] = 1;
+  } else {
+    this.CGB = 0;
+    this.VRAM = this.getTypedArray(8192, "float64");
+    this.WRAM = this.getTypedArray(8192, "float64");
+    for (var i = 0; i < 3136; i++) {
+      this.Tiles.push({
+        tile: "11111111",
+        len: "8",
+        p: "0"
+      });
+    }
+    this.Registers[0] = 1;
+  }
+  this.CGBDMA = this.getTypedArray(5, "float64");
+}
+GBCJS.prototype.run = function() {
+  var dd = Date.now();
+  if (!(this._ticks > 0)) {
+    this._ticks += this.emulatorSpeed;
+  }
+  while (this._ticks > 0) {
+    while ((this.turbo || (this.AudioFrames == 0)) && ((Date.now() - dd) < 33)) {
+      this.Cycles = 4;
+      if (this.CGBDMA[0] == 1 && this.CGBDMA[1] == 0) {
+        this.CGB_DMA_Transfer(2);
+        this.Cycles = 4 * this.CPUSpeed;
+      } else {
+        this.step_cpu();
+      }
+      this.Cycle();
+    }
+    this.AudioLoop();
+    this._ticks--;
+  }
+  this.Draw();
+}
+GBCJS.prototype.AudioLoop = function() {
+  this.audioCycles += this.AudioFrames * 70224;
+  if (this.AudioEngine[8] == 1) 
+    this.AudioEngine[8] = 0;
+  if (this.AudioEngine[9 + 8] == 1) 
+    this.AudioEngine[9 + 8] = 0;
+  if (this.AudioEngine[18 + 8] == 1) 
+    this.AudioEngine[18 + 8] = 0;
+  if (this.AudioEngine[27 + 8] == 1) 
+    this.AudioEngine[27 + 8] = 0;
+  while (!(this.audioCycles < 8192)) {
+    this.soundPhase = (this.soundPhase + 1) % 8;
+    if ((this.soundPhase & 1) == 0) {
+      this.clockLength(0);
+      this.clockLength(1);
+      this.clockLength(2);
+      this.clockLength(3);
+    }
+    if (this.soundPhase == 7) {
+      this.envelopeTick(0);
+      this.envelopeTick(1);
+      this.envelopeTick(3);
+    }
+    if ((this.soundPhase % 4) == 2) {
+      if (this.AudioEngine[0] == 1) {
+        var period = Math.floor(this.ZRAM[272] / 16) % 8;
+        this.AudioEngine[2]--;
+        if (this.AudioEngine[2] < 1) {
+          if (period > 0) {
+            this.AudioEngine[2] = period;
+            this.CalculateSweep();
+          } else {
+            this.AudioEngine[2] = 0;
+          }
+        }
+      }
+    }
+    this.audioCycles -= 8192;
+  }
+  this.AudioFrames = 0;
+  this.MasterVolumeLeft = (1 + (Math.floor(this.ZRAM[292] / 16) % 8)) / 8;
+  this.MasterVolumeRight = (1 + (this.ZRAM[292] % 8)) / 8;
+  this.Panning();
+}
+GBCJS.prototype.Panning = function() {
+  var mixing = this.ZRAM[293];
+  var left = Math.floor(mixing / 16);
+  var right = mixing % 16;
+  for (var ch = 0; ch < 4; ch++) {
+    this.AudioEngineStereoLeft[ch] = this.MasterVolumeLeft * (Math.floor(left) % 2);
+    this.AudioEngineStereoRight[ch] = this.MasterVolumeRight * (Math.floor(right) % 2);
+    left *= 0.5;
+    right *= 0.5;
+  }
+}
+GBCJS.prototype.clockLength = function(ch) {
+  if ((this.ZRAM[(65296 + ((ch * 5) + 4)) - 65024] % 128) > 63) {
+    this.AudioEngine[(ch * 9) + 4]--;
+    if (this.AudioEngine[(ch * 9) + 4] == 0) {
+      this.ChannelOff(ch);
+    }
+  }
+}
+GBCJS.prototype.envelopeTick = function(ch) {
+  if (this.AudioEngineEnables[ch] == 1) {
+    var attr = this.ZRAM[274 + (ch * 5)];
+    var period = attr % 8;
+    this.AudioEngine[(ch * 9) + 3]--;
+    if (this.AudioEngine[(ch * 9) + 3] < 1) {
+      if (period > 0) {
+        this.AudioEngine[(ch * 9) + 3] = period;
+        var volume = this.AudioEngine[(ch * 9) + 5];
+        if ((attr % 16) > 7) volume++;
+        else volume--;
+        if (volume < 0) volume = 0;
+        if (volume > 15) volume = 15;
+        this.AudioEngine[(ch * 9) + 5] = volume;
+        this.AudioEngine[(ch * 9) + 6] = (this.AudioEngine[(ch * 9) + 5] / 16) * 100;
+      } else {
+        this.AudioEngine[(ch * 9) + 3] = 8;
+      }
+    }
+  }
+}
+GBCJS.prototype.CalculateSweep = function() {
+  var shift = this.ZRAM[272] % 8;
+  var cfreq = Math.floor(this.AudioEngine[1] / BitDivisorTable[shift]);
+  if ((this.ZRAM[272] % 16) > 7) {
+    this.AudioEngine[1] -= cfreq;
+  } else {
+    this.AudioEngine[1] += cfreq;
+  }
+  if (this.AudioEngine[1] > 2047) {
+    this.AudioEngine[1] = 2047;
+    this.ChannelOff(0);
+  }
+  this.AudioEngine[7] = 524228 / ((2048 - this.AudioEngine[1]) * 4);
+}
+GBCJS.prototype.ChannelOff = function(ch) {
+  this.AudioEngine[(ch * 9) + 6] = 0;
+  this.AudioEngine[(ch * 9) + 7] = -1;
+  this.AudioEngineEnables[ch] = 0;
+}
+GBCJS.prototype.Draw = function() {
+  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  this.ctx.putImageData(this.imageData, 0, 0);
+}
+GBCJS.prototype.Cycle = function() {
+  this.LineCycles += this.Cycles / this.CPUSpeed;
+  this.TimerClock += this.Cycles;
+  if (this.TimerClock > 15) {
+    this.TimerClock -= 16;
+    this.TimerDiv++;
+    this.TimerDiv = this.TimerDiv % 64;
+    if ((this.TimerDiv & 15) == 0) {
+      this.ZRAM[260] = (this.ZRAM[260] + 1) & 0xff;
+    }
+    if (((this.ZRAM[263] % 8) > 3) && ((this.TimerDiv % TimerMods[this.ZRAM[263] % 4]) == 0)) {
+      this.ZRAM[261]++;
+      if (this.ZRAM[261] > 255) {
+        this.ZRAM[261] = this.ZRAM[262];
+        this.iREQ |= 4;
+      }
+    }
+  }
+  if (this.LineCycles > this.NextLineChange) {
+    if (this.LCDState > 1) {
+      if (this.LCDState > 2) {
+        this.LCDState = 0;
+        if ((this.CGBDMA[0] + this.CGBDMA[1]) == 2) {
+          this.CGB_DMA_Transfer(16);
+        }
+        if (this.FrameskipCounter == 0) {
+          this.LCDDrawLine(this.ZRAM[324], 0, this.ZRAM[324]);
+        }
+        if ((this.LCDStatIns[0] == 1) && (Math.floor(this.ZRAM[320] / 128) > 0)) {
+          this.iREQ |= 2;
+        }
+        this.NextLineChange = 455;
+      } else {
+        this.LCDState = 3;
+        this.NextLineChange = 251;
+      }
+    } else {
+      this.ZRAM[324]++;
+      this.ZRAM[324] = this.ZRAM[324] % 154;
+      if (this.ZRAM[324] == this.ZRAM[325]) {
+        if ((this.ScanlineCoincidence == 0) && (this.LCDStatIns[3] == 1)) {
+          this.iREQ |= 2;
+        }
+        this.ScanlineCoincidence = 1;
+      } else {
+        this.ScanlineCoincidence = 0;
+      }
+      this.LineCycles -= 456;
+      if (this.LCDState > 0) {
+        if (this.ZRAM[324] == 0) {
+          this.LCDState = 2;
+          this.NextLineChange = 80;
+          if ((this.LCDStatIns[2] == 1) && (Math.floor(this.ZRAM[320] / 128) > 0)) {
+            this.iREQ |= 2;
+          }
+        }
+      } else {
+        if (this.ZRAM[324] == 144) {
+          this.NextLineChange = 455;
+          this.LCDState = 1;
+          this.FrameskipCounter++;
+          this.AudioFrames++;
+          if (this.FrameskipCounter > this.getFrameskip()) {
+            this.FrameskipCounter = 0;
+          }
+          if (this.Input.join("") != this.oldinput) {
+            this.iREQ |= 16;
+          }
+          if (Math.floor(this.ZRAM[320] / 128) > 0) {
+            this.iREQ |= 1;
+            if (this.LCDStatIns[1] == 1) {
+              this.iREQ |= 2;
+            }
+          }
+          this.oldinput = this.Input.join("");
+        } else {
+          this.LCDState = 2;
+          this.NextLineChange = 80;
+          if ((this.LCDStatIns[2] == 1) && (Math.floor(this.ZRAM[320] / 128) > 0)) {
+            this.iREQ |= 2;
+          }
+        }
+      }
+    }
+  }
+  if (this.Halted == 1) {
+    var iMASK = this.iREQ & this.iFLAGS;
+    if (iMASK == 0) {
+      this.IdleSkip();
+    } else {
+      this.Halted = 0;
+    }
+  }
+  if (this.enableIterrupts == 1) {
+    var iMASK = this.iREQ & this.iFLAGS;
+    if (iMASK > 0) {
+      this.enableIterrupts = 0;
+      if ((iMASK & 1) > 0) {
+        this.iREQ &= 30;
+        this.RST(8);
+      } else {
+        if ((iMASK % 4) > 1) {
+          this.iREQ &= 29;
+          this.RST(9);
+        } else {
+          if ((iMASK % 8) > 3) {
+            this.iREQ &= 27;
+            this.RST(10);
+          } else {
+            if ((iMASK & 15) > 7) {
+              this.iREQ &= 23;
+              this.RST(11);
+            } else {
+              if ((iMASK % 32) > 15) {
+                this.iREQ &= 15;
+                this.RST(12);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.IdleSkip = function() {
+  var skipCycle1 = 200000;
+  var skipCycle2 = 200000;
+  var skipCycle3 = 200000;
+  var skipTo = 200000;
+  var lastmemory = 0;
+  var result = 0;
+  if ((this.ZRAM[263] % 8) > 3) {
+    lastmemory = TimerMods[this.ZRAM[263] % 4];
+    result = (255 - this.ZRAM[261]) * (lastmemory * 16);
+    result += (16 - this.TimerClock) + (16 * ((lastmemory - 1) - (this.TimerDiv % lastmemory)));
+    skipCycle3 = result;
+    if (((this.iFLAGS % 8) > 3) && (result < skipTo)) {
+      skipTo = result;
+    }
+  }
+  if (Math.floor(this.ZRAM[320] / 128) > 0) {
+    result = 144 - this.ZRAM[324];
+    if (result < 1) {
+      result += 154;
+    }
+    var _ = (((result - 1) * 456) + (456 - this.LineCycles)) * this.CPUSpeed;
+    result = _;
+    skipCycle1 = result;
+    if (this.LCDStatIns[1] == 1) {
+      skipCycle2 = result;
+    }
+    if (((this.iFLAGS & 1) > 0) && (result < skipTo)) {
+      skipTo = result;
+    }
+    if (this.LCDStatIns[3] == 1) {
+      result = this.ZRAM[325] - this.ZRAM[324];
+      if (result < 1) {
+        result += 154;
+      }
+      var _ = (((result - 1) * 456) + (456 - this.LineCycles)) * this.CPUSpeed;
+      result = _;
+      if (result < skipCycle2) {
+        skipCycle2 = result;
+      }
+    }
+    if ((this.LCDStatIns[0] + this.LCDStatIns[2]) > 0) {
+      if (this.ZRAM[324] > 142) {
+        lastmemory = (((153 - this.ZRAM[324]) * 456) + (456 - this.LineCycles)) * this.CPUSpeed;
+      }
+      if (this.LCDStatIns[0] == 1) {
+        if ((this.ZRAM[324] > 143) || ((this.ZRAM[324] == 143) && (this.LineCycles > 252))) {
+          result = lastmemory + (252 * this.CPUSpeed);
+        } else {
+          result = 252 - this.LineCycles;
+          if (result < 1) {
+            result += 456;
+          }
+          result *= this.CPUSpeed;
+        }
+        if (result < skipCycle2) {
+          skipCycle2 = result;
+        }
+      }
+      if (this.LCDStatIns[2] == 1) {
+        if (this.ZRAM[324] > 143) {
+          result = lastmemory;
+        } else {
+          result = (456 - this.LineCycles) * this.CPUSpeed;
+        }    
+        if (result < skipCycle2) {
+          skipCycle2 = result;
+        }
+      }
+    }
+    if (((this.iFLAGS % 4) > 1) && (skipCycle2 < skipTo)) {
+      skipTo = skipCycle2;
+    }
+  }
+  if (skipTo == 200000) {
+    skipTo--;
+  } else {
+    this.Halted = 0;
+  }
+  this.LineCycles += skipTo / this.CPUSpeed;
+  this.TimerClock += skipTo;
+  if ((this.LineCycles > 252) && ((this.LCDState == 2) || (this.LCDState == 3))) {
+    if ((this.CGBDMA[0] + this.CGBDMA[1]) == 2) {
+      this.CGB_DMA_Transfer(16);
+    }
+    if (this.FrameskipCounter == 0) {
+      this.LCDDrawLine(this.ZRAM[324], 0, this.ZRAM[324]);
+    }
+  }
+  while (!(this.LineCycles < 456)) {
+    this.ZRAM[324]++;
+    this.ZRAM[324] = this.ZRAM[324] % 154;
+    this.LineCycles -= 456;
+    if ((this.ZRAM[324] < 144) && (this.LineCycles > 455)) {
+      if ((this.CGBDMA[0] + this.CGBDMA[1]) == 2) {
+        this.CGB_DMA_Transfer(16);
+      }
+      if (this.FrameskipCounter == 0) {
+        this.LCDDrawLine(this.ZRAM[324], 0, this.ZRAM[324]);
+      }
+    }
+    if (this.ZRAM[324] == 143) {
+      this.FrameskipCounter++;
+      this.AudioFrames++;
+      if (this.FrameskipCounter > this.getFrameskip()) {
+        this.FrameskipCounter = 0;
+      }
+      if (this.Input.join("") != this.oldinput) {
+        this.iREQs[4] = 1;
+      }
+      this.oldinput = this.Input.join("");
+    }
+  }
+  if (this.ZRAM[324] == this.ZRAM[325]) {
+    this.ScanlineCoincidence = 1;
+  } else {
+    this.ScanlineCoincidence = 0;
+  }
+  if (this.ZRAM[324] < 144) {
+    if (this.LineCycles < 81) {
+      this.LCDState = 2;
+      this.NextLineChange = 80;
+    } else {
+      if (this.LineCycles < 253) {
+        this.LCDState = 3;
+        this.NextLineChange = 251;
+      } else {
+        this.LCDState = 0;
+        this.NextLineChange = 455;
+      }
+    }
+  } else {
+    this.LCDState = 1;
+    this.NextLineChange = 455;
+  }
+  lastmemory = Math.floor(this.TimerClock / 16);
+  this.ZRAM[260] = (this.ZRAM[260] + Math.floor(lastmemory / 16)) & 0xff;
+  if ((this.ZRAM[263] % 8) > 3) {
+    var i = TimerMods[this.ZRAM[263] % 4];
+    result = Math.floor(lastmemory / i);
+    if (((lastmemory % i) + (this.TimerDiv % i)) > (i - 1)) {
+      result++;
+    }
+    this.ZRAM[261] = this.ZRAM[262] + (((this.ZRAM[261] - this.ZRAM[262]) + result) % (256 - this.ZRAM[262]));
+  }
+  this.TimerDiv += lastmemory;
+  this.TimerDiv = this.TimerDiv % 64;
+  this.TimerClock -= (lastmemory * 16);
+  if (!((skipTo < skipCycle1) || (skipCycle1 == 200000))) {
+    this.iREQ |= 1;
+  }
+  if (!((skipTo < skipCycle2) || (skipCycle2 == 200000))) {
+    this.iREQ |= 2;
+  }
+  if (!((skipTo < skipCycle3) || (skipCycle3 == 200000))) {
+    this.iREQ |= 4;
+  }
+}
+GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
+  if (this.CGB == 1) {
+    this.CGB_LCDDrawLine(number1, sx, sy);
+  } else {
+    var bt = [];
+    var result = 128;
+    for (var i = 0; i < 8; i++) {
+      bt.push(Math.floor(this.ZRAM[320] / result) & 1);
+      result = result / 2;
+    }
+    var color = 0;
+    var TileNumber = 1;
+    var lastmemory = 0;
+    var tilepixscan = 0;
+    var bgmaploc = 0;
+    var bgxfine = 0;
+    var tilex = 0;
+    var tileoffesty = 0;
+    var spriteX = 0;
+    var osx = 0;
+    var tileLocation = 0;
+    var tileincmentor = 0;
+    for (var __ = 0; __ < 160; __++) {
+      this.DrawDot(__, sy, ScreenColours[0]);
+    }
+    if (bt[0] == 1) {
+      if (bt[7] == 1) {
+        spriteX = sx;
+        bgxfine = this.ZRAM[323] % 8;
+        lastmemory = (number1 + this.ZRAM[322]) & 0xff;
+        tileoffesty = Math.floor(lastmemory / 8);
+        tilepixscan = (lastmemory % 8) + 1;
+        tilex = Math.floor(this.ZRAM[323] / 8);
+        tileLocation = 4096 - (bt[3] * 4096);
+        bgmaploc = 6145 + (bt[4] * 1024);
+        TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+        if ((bt[3] == 0) && (TileNumber > 127)) {
+          TileNumber -= 256;
+        }
+        tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + tilepixscan)) | 0;
+        if (!this.Tiles[tileincmentor - 1]) return;
+        result = this.Tiles[tileincmentor - 1].p;
+        tileincmentor = this.Tiles[tileincmentor - 1].len;
+        spriteX += 0 - bgxfine;
+        osx = spriteX;
+        lastmemory = 0 - bgxfine;
+        bgxfine = 1;
+        while(!(lastmemory > 159)) {
+          color = this.Pallete[+result[bgxfine - 1] - 1];
+          spriteX += +tileincmentor[bgxfine - 1] || 0;
+          while(spriteX != osx) {
+            this.DrawDot(osx, sy, color);
+            osx++;
+          }
+          lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
+          bgxfine++;
+          if (bgxfine > result.length) {
+            bgxfine = 1;
+            tilex += 1;
+            tilex = tilex % 32;
+            TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+            if ((bt[3] == 0) && (TileNumber > 127)) {
+              TileNumber -= 256;
+            }
+            tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + tilepixscan)) | 0;
+            if (!this.Tiles[tileincmentor - 1]) return;
+            result = this.Tiles[tileincmentor - 1].p;
+            tileincmentor = this.Tiles[tileincmentor - 1].len;
+          }
+        }
+      }
+      lastmemory = number1 - this.ZRAM[330];
+      if ((bt[2] == 1) && (lastmemory > -1)) {
+        spriteX = sx + (this.ZRAM[331] - 7);
+        bgxfine = 0;
+        tileoffesty = Math.floor(lastmemory / 8);
+        tilepixscan = (lastmemory % 8) + 1;
+        tilex = 0;
+        tileLocation = 4096 - (bt[3] * 4096);
+        bgmaploc = 6145 + (bt[1] * 1024);
+        TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+        if ((bt[3] == 0) && (TileNumber > 127)) {
+          TileNumber -= 256;
+        }
+        tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + tilepixscan)) | 0;
+        if (!this.Tiles[tileincmentor - 1]) return;
+        result = this.Tiles[tileincmentor - 1].p;
+        tileincmentor = this.Tiles[tileincmentor - 1].len;
+        lastmemory = this.ZRAM[331] - 7;
+        osx = spriteX;
+        bgxfine = 1;
+        while(!(lastmemory > 159)) {
+          color = this.Pallete[+result[bgxfine - 1] - 1];
+          spriteX += +tileincmentor[bgxfine - 1] || 0;
+          while(spriteX != osx) {
+            this.DrawDot(osx, sy, color);
+            osx++;
+          }
+          lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
+          bgxfine++;
+          if (bgxfine > result.length) {
+            bgxfine = 1;
+            tilex += 1;
+            tilex = tilex % 32;
+            TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+            if ((bt[3] == 0) && (TileNumber > 127)) {
+              TileNumber -= 256;
+            }
+            tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + tilepixscan)) | 0;
+            if (!this.Tiles[tileincmentor - 1]) return;
+            result = this.Tiles[tileincmentor - 1].p;
+            tileincmentor = this.Tiles[tileincmentor - 1].len;
+          }
+        }
+      }
+      tileincmentor = 1;
+      if (bt[6] == 1) {
+        var spriteSize = (bt[5] == 1) ? 16 : 8;
+        for (var _ = 0; _ < 40; _++) {
+          tilepixscan = number1 - (this.ZRAM[tileincmentor - 1] - 16);
+          if ((tilepixscan > -1) && (spriteSize > tilepixscan)) {
+            bgmaploc = this.ZRAM[tileincmentor + 2];
+            if ((Math.floor(bgmaploc / 64) & 1) == 1) {
+              tilepixscan = (spriteSize - 1) - tilepixscan;
+            }
+            lastmemory = (this.ZRAM[tileincmentor + 1] * 8) + (tilepixscan + 1);
+            if (!this.Tiles[lastmemory - 1]) return;
+            result = this.Tiles[lastmemory - 1].len;
+            lastmemory = this.Tiles[lastmemory - 1].p;
+            bgxfine = 0;
+            tileLocation = 1;
+            if ((Math.floor(bgmaploc / 32) & 1) == 1) {
+              spriteX = (sx + (this.ZRAM[tileincmentor] - 1)) || 0;
+              TileNumber = -1;
+            } else {
+              spriteX = (sx + (this.ZRAM[tileincmentor] - 8)) || 0;
+              TileNumber = 1;
+            }
+            osx = spriteX;
+            while (!(bgxfine > 7)) {
+              if (lastmemory[tileLocation - 1] == 1) {
+                spriteX += ((+result[tileLocation - 1]) * TileNumber) || 0;
+              } else {
+                var fhgfh = +lastmemory[tileLocation - 1];
+                if ((bgmaploc % 32) > 15) {
+                  color = this.SpritePal[fhgfh + 3];
+                } else {
+                  color = this.SpritePal[fhgfh - 1];
+                }
+                osx = spriteX;
+                spriteX += (((+result[tileLocation - 1]) - 1) * TileNumber) || 0;
+                var gfgd = 32;
+                while(spriteX != osx && gfgd > 0) {
+                  this.DrawDot(osx, sy, color);
+                  var jh = num_sign(spriteX - osx);
+                  osx += jh;
+                  gfgd--;
+                }
+                this.DrawDot(osx, sy, color);
+                spriteX += TileNumber;
+              }
+              bgxfine += (+result[tileLocation - 1]) || 0;
+              tileLocation++;
+            }
+          }
+          tileincmentor += 4;
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.CGB_LCDDrawLine = function(number1, sx, sy) {
+  var bt = [];
+  var result = 128;
+  for (var i = 0; i < 8; i++) {
+    bt.push(Math.floor(this.ZRAM[320] / result) & 1);
+    result = result / 2;
+  }
+  var color = 0;
+  var TileNumber = 1;
+  var lastmemory = 0;
+  var tilepixscan = 0;
+  var bgmaploc = 0;
+  var bgxfine = 0;
+  var tilex = 0;
+  var tileoffesty = 0;
+  var spriteX = 0;
+  var osx = 0;
+  var tileLocation = 0;
+  var tileincmentor = 0;
+  var drawAttrib = 0;
+  var drawPalnum = 0;
+  var draw_yPx = 0;
+  var draw_xFineDir = 0;
+  for (var __ = 0; __ < 160; __++) {
+    this.DrawDot(__, sy, 0xFFFFFF);
+  }
+  if (bt[0] == 1) {
+    if (bt[7] == 1) {
+      spriteX = sx;
+      bgxfine = this.ZRAM[323] % 8;
+      lastmemory = (number1 + this.ZRAM[322]) & 0xff;
+      tileoffesty = Math.floor(lastmemory / 8);
+      tilepixscan = (lastmemory % 8) + 1;
+      tilex = Math.floor(this.ZRAM[323] / 8);
+      tileLocation = 4096 - (bt[3] * 4096);
+      bgmaploc = 6145 + (bt[4] * 1024);
+      drawAttrib = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) + 8191];
+      drawPalnum = (drawAttrib % 8) * 4;
+      if ((drawAttrib % 128) > 63) {
+        draw_yPx = 9 - tilepixscan;
+      } else {
+        draw_yPx = tilepixscan;
+      }
+      TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+      if ((bt[3] == 0) && (TileNumber > 127)) {
+        TileNumber -= 256;
+      }
+      tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + draw_yPx)) | 0;
+      if ((drawAttrib % 16) > 7) {
+        tileincmentor += 3136;
+      }
+      if (!this.Tiles[tileincmentor - 1]) return;
+      result = this.Tiles[tileincmentor - 1].p;
+      tileincmentor = this.Tiles[tileincmentor - 1].len;
+      spriteX += 0 - bgxfine;
+      osx = spriteX;
+      lastmemory = 0 - bgxfine;
+      if ((drawAttrib % 64) > 31) {
+        draw_xFineDir = -1;
+        bgxfine = result.length;
+      } else {
+        draw_xFineDir = 1;
+        bgxfine = 1;
+      }
+      while(!(lastmemory > 159)) {
+        color = this.CGBBGPalCol[(+result[bgxfine - 1] + drawPalnum) - 1];
+        spriteX += +tileincmentor[bgxfine - 1] || 0;
+        while(spriteX != osx) {
+          this.DrawDot(osx, sy, color);
+          osx++;
+        }
+        lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
+        bgxfine += draw_xFineDir;
+        if (bgxfine > result.length || bgxfine == 0) {
+          tilex += 1;
+          tilex = tilex % 32;
+          drawAttrib = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) + 8191];
+          drawPalnum = (drawAttrib % 8) * 4;
+          if ((drawAttrib % 128) > 63) {
+            draw_yPx = 9 - tilepixscan;
+          } else {
+            draw_yPx = tilepixscan;
+          }
+          TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+          if ((bt[3] == 0) && (TileNumber > 127)) {
+            TileNumber -= 256;
+          }
+          tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + draw_yPx)) | 0;
+          if ((drawAttrib % 16) > 7) {
+            tileincmentor += 3136;
+          }
+          if (!this.Tiles[tileincmentor - 1]) return;
+          result = this.Tiles[tileincmentor - 1].p;
+          tileincmentor = this.Tiles[tileincmentor - 1].len;
+          if ((drawAttrib % 64) > 31) {
+            draw_xFineDir = -1;
+            bgxfine = result.length;
+          } else {
+            draw_xFineDir = 1;
+            bgxfine = 1;
+          }
+        }
+      }
+    }
+    lastmemory = number1 - this.ZRAM[330];
+    if ((bt[2] == 1) && (lastmemory > -1)) {
+      spriteX = sx + (this.ZRAM[331] - 7);
+      bgxfine = 0;
+      tileoffesty = Math.floor(lastmemory / 8);
+      tilepixscan = (lastmemory % 8) + 1;
+      tilex = 0;
+      tileLocation = 4096 - (bt[3] * 4096);
+      bgmaploc = 6145 + (bt[1] * 1024);
+      drawAttrib = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) + 8191];
+      drawPalnum = (drawAttrib % 8) * 4;
+      if ((drawAttrib % 128) > 63) {
+        draw_yPx = 9 - tilepixscan;
+      } else {
+        draw_yPx = tilepixscan;
+      }
+      TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+      if ((bt[3] == 0) && (TileNumber > 127)) {
+        TileNumber -= 256;
+      }
+      tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + draw_yPx)) | 0;
+      if ((drawAttrib % 16) > 7) {
+        tileincmentor += 3136;
+      }
+      if (!this.Tiles[tileincmentor - 1]) return;
+      result = this.Tiles[tileincmentor - 1].p;
+      tileincmentor = this.Tiles[tileincmentor - 1].len;
+      lastmemory = this.ZRAM[331] - 7;
+      osx = spriteX;
+      if ((drawAttrib % 64) > 31) {
+        draw_xFineDir = -1;
+        bgxfine = result.length;
+      } else {
+        draw_xFineDir = 1;
+        bgxfine = 1;
+      }
+      while(!(lastmemory > 159)) {
+        color = this.CGBBGPalCol[(+result[bgxfine - 1] + drawPalnum) - 1];
+        spriteX += +tileincmentor[bgxfine - 1] || 0;
+        while(spriteX != osx) {
+          this.DrawDot(osx, sy, color);
+          osx++;
+        }
+        lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
+        bgxfine += draw_xFineDir;
+        if (bgxfine > result.length || bgxfine == 0) {
+          tilex += 1;
+          tilex = tilex % 32;
+          drawAttrib = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) + 8191];
+          drawPalnum = (drawAttrib % 8) * 4;
+          if ((drawAttrib % 128) > 63) {
+            draw_yPx = 9 - tilepixscan;
+          } else {
+            draw_yPx = tilepixscan;
+          }
+          TileNumber = this.VRAM[(bgmaploc + ((tileoffesty * 32) + tilex)) - 1];
+          if ((bt[3] == 0) && (TileNumber > 127)) {
+            TileNumber -= 256;
+          }
+          tileincmentor = ((tileLocation / 2) + ((TileNumber * 8) + draw_yPx)) | 0;
+          if ((drawAttrib % 16) > 7) {
+            tileincmentor += 3136;
+          }
+          if (!this.Tiles[tileincmentor - 1]) return;
+          result = this.Tiles[tileincmentor - 1].p;
+          tileincmentor = this.Tiles[tileincmentor - 1].len;
+          if ((drawAttrib % 64) > 31) {
+            draw_xFineDir = -1;
+            bgxfine = result.length;
+          } else {
+            draw_xFineDir = 1;
+            bgxfine = 1;
+          }
+        }
+      }
+    }
+    tileincmentor = 1;
+    if (bt[6] == 1) {
+      var spriteSize = (bt[5] == 1) ? 16 : 8;
+      for (var _ = 0; _ < 40; _++) {
+        tilepixscan = number1 - (this.ZRAM[tileincmentor - 1] - 16);
+        if ((tilepixscan > -1) && (spriteSize > tilepixscan)) {
+          bgmaploc = this.ZRAM[tileincmentor + 2];
+          if ((bgmaploc % 128) > 63) {
+            tilepixscan = (spriteSize - 1) - tilepixscan;
+          }
+          lastmemory = (this.ZRAM[tileincmentor + 1] * 8) + (tilepixscan + 1);
+          if ((bgmaploc % 16) > 7) {
+            lastmemory += 3136;
+          }
+          drawPalnum = (bgmaploc % 8) * 4;
+          if (!this.Tiles[lastmemory - 1]) return;
+          result = this.Tiles[lastmemory - 1].len;
+          lastmemory = this.Tiles[lastmemory - 1].p;
+          bgxfine = 0;
+          tileLocation = 1;
+          if ((bgmaploc % 64) > 31) {
+            spriteX = (sx + (this.ZRAM[tileincmentor] - 1)) || 0;
+            TileNumber = -1;
+          } else {
+            spriteX = (sx + (this.ZRAM[tileincmentor] - 8)) || 0;
+            TileNumber = 1;
+          }
+          osx = spriteX;
+          while (!(bgxfine > 7)) {
+            if (+lastmemory[tileLocation - 1] == 1) {
+              spriteX += ((+result[tileLocation - 1]) * TileNumber) || 0;
+            } else {
+              var fhgfh = (+lastmemory[tileLocation - 1]) + drawPalnum;
+              color = this.CGBSprPalCol[fhgfh - 1];
+              osx = spriteX;
+              spriteX += (((+result[tileLocation - 1]) - 1) * TileNumber) || 0;
+              var gfgd = 32;
+              while(spriteX != osx && gfgd > 0) {
+                this.DrawDot(osx, sy, color);
+                var jh = num_sign(spriteX - osx);
+                osx += jh;
+                gfgd--;
+              }
+              this.DrawDot(osx, sy, color);
+              spriteX += TileNumber;
+            }
+            bgxfine += (+result[tileLocation - 1]) || 0;
+            tileLocation++;
+          }
+        }
+        tileincmentor += 4;
+      }
+    }
+  }
+}
+GBCJS.prototype.DrawDot = function(x, y, color) {
+  if (x >= 0 && x < 160 && y >= 0 && y < 144 && color != null) {
+    var r = (color >> 16) & 255;
+    var g = (color >> 8) & 255;
+    var b = color & 255;
+    var data = this.imageData.data;
+    var i = ((y * 160) + x) << 2;
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+    data[i + 3] = 255;    
+  }
+}
+GBCJS.prototype.MMU_read_byte = function(location) {
+  if (32768 > location) {
+    if (this.inbios == 1) {
+      if (this.CGB == 1) {
+        if (location == 256) {
+          this.inbios = 0;
+          return this.MMU_read_byte(location);
+        } else {
+          if (2304 > location) {
+            return GBC_BIOS[location] & 0xff;
+          } else {
+            if (16384 > location) {
+              return this.ROM[location] & 0xff;
+            } else {
+              return this.ROM[location + ((this.MBC[5] - 1) * 16384)] & 0xff;
+            }
+          }
+        }
+      } else {
+        if (location == 256) {
+          this.inbios = 0;
+          return this.MMU_read_byte(location);
+        } else {
+          if (256 > location) {
+            return GB_BIOS[location] & 0xff;
+          } else {
+            if (16384 > location) {
+              return this.ROM[location] & 0xff;
+            } else {
+              return this.ROM[location + ((this.MBC[5] - 1) * 16384)] & 0xff;
+            }
+          }
+        }
+      }
+    } else {
+      if (16384 > location) {
+        return this.ROM[location] & 0xff;
+      } else {
+        return this.ROM[location + ((this.MBC[5] - 1) * 16384)] & 0xff;
+      }
+    }
+  } else {
+    if (40960 > location) {
+      if (this.CGB == 1) {
+        return this.VRAM[(location - 32768) + (this.ZRAM[335] * 8192)] & 0xff;
+      } else {
+        return this.VRAM[location - 32768] & 0xff;
+      }
+    } else {
+      if (49152 > location) {
+        if (this.MBC[4] == 1) {
+          return this.ERAM[(location - 40960) + (this.MBC[7] * 8196)] & 0xff;
+        } else {
+          return 0;
+        }
+      } else {
+        if (57344 > location) {
+          if (this.CGB == 1) {
+            if (0xD000 > location) {
+              return this.WRAM[location - 49152] & 0xff;
+            } else {
+              return this.WRAM[(location - 53248) + (this.ZRAM[368] * 4096)] & 0xff;
+            }
+          } else {
+            return this.WRAM[location - 49152] & 0xff;
+          }
+        } else {
+          if (65024 > location) {
+            if (this.CGB == 1) {
+              if (0xF000 > location) {
+                return this.WRAM[location - 57344] & 0xff;
+              } else {
+                return this.WRAM[(location - 61440) + (this.ZRAM[368] * 4096)] & 0xff;
+              }
+            } else {
+              return this.WRAM[location - 57344] & 0xff;
+            }
+          } else {
+            if ((this.CGB == 1) && ((location > 0xFF4C) && (location < 0xFF78))) {
+              return this.CGB_IO_read_byte(location, this.ZRAM[location - 65024]);
+            } else {
+              if (location == 65345) {
+                return (this.LCDState + (this.ScanlineCoincidence * 4)) + (Math.floor(this.ZRAM[65345 - 65024] / 8) * 8);
+              } else {
+                if (location == 0xFFFF) {
+                  return this.iFLAGS;
+                } else {
+                  if (location == 0xFF0F) {
+                    return this.iREQ;
+                  } else {
+                    return this.ZRAM[location - 65024] & 0xff;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
+GBCJS.prototype.CGB_IO_read_byte = function(location, lastmemory) {
+  if (location == 0xFF4D) {
+    return (lastmemory & 1) + ((this.CPUSpeed - 1) * 128);
+  } else {
+    if (location == 0xFF69) {
+      return this.CGBBGPalReg[this.ZRAM[360] % 64];
+    } else {
+      if (location == 0xFF6B) {
+        return this.CGBSprPalReg[this.ZRAM[362] % 64];
+      } else {
+        if (location == 0xFF51) {
+          return Math.floor(this.CGBDMA[3] / 256);
+        } else {
+          if (location == 0xFF52) {
+            return this.CGBDMA[3] % 256;
+          } else {
+            if (location == 0xFF53) {
+              return Math.floor(this.CGBDMA[4] / 256);
+            } else {
+              if (location == 0xFF54) {
+                return this.CGBDMA[4] % 256;
+              } else {
+                if (location == 0xFF55) {
+                  if (this.CGBDMA[3] == 1) {
+                    return 128 + (Math.floor(this.CGBDMA[2] / 16) - 1);
+                  } else {
+                    return 0;
+                  }
+                } else {
+                  return lastmemory;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.MMU_write_byte = function(value, location) {
+  if (0x8000 > location) {
+    this.MBCWriteHandler(location, value);
+  } else {
+    if (0xA000 > location) {
+      if (this.CGB == 1) {
+        this.VRAM[(location - 32768) + (this.ZRAM[335] * 8192)] = value;
+      } else {
+        this.VRAM[location - 32768] = value;
+      }
+      if (39040 > location) {
+        this.UpdateTile(location);
+      }
+    } else {
+      if (0xC000 > location) {
+        if (this.MBC[4] == 1) {
+          this.ERAM[(location - 40960) + (this.MBC[7] * 8196)] = value;
+        }
+      } else {
+        if (0xE000 > location) {
+          if (this.CGB == 1) {
+            if (0xD000 > location) {
+              this.WRAM[location - 49152] = value;
+            } else {
+              this.WRAM[(location - 53248) + (this.ZRAM[368] * 4096)] = value;
+            }
+          } else {
+            this.WRAM[location - 49152] = value;
+          }
+        } else {
+          if (0xFE00 > location) {
+            if (this.CGB == 1) {
+              if (0xF000 > location) {
+                this.WRAM[location - 57344] = value;
+              } else {
+                this.WRAM[(location - 61440) + (this.ZRAM[368] * 4096)] = value;
+              }
+            } else {
+              this.WRAM[location - 57344] = value;
+            }
+          } else {
+            if (location > 0xFEFF && location < 0xFF80) {
+              if (location > 0xFF0F && location < 0xFF24) {
+                this.NR(Math.floor((location - 65296) / 5), (location - 65296) % 5, value, location - 65024);
+              } else {
+                if ((this.CGB == 1) && (location > 0xFF4C && location < 0xFF78)) {
+                  this.ZRAM[location - 65024] = value;
+                  this.CGB_IO_write_byte(value, location);
+                } else {
+                  if (location == 0xFF00) {
+                    if (((Math.floor(value / 16) & 1) == 1) && ((Math.floor(value / 32) & 1) == 0)) {
+                      this.ZRAM[256] = this.Input[7] + (this.Input[6] * 2) + (this.Input[5] * 4) + (this.Input[4] * 8);
+                    } else if (((Math.floor(value / 16) & 1) == 0) && ((Math.floor(value / 32) & 1) == 1)) {
+                      this.ZRAM[256] = this.Input[3] + (this.Input[2] * 2) + (this.Input[1] * 4) + (this.Input[0] * 8);
+                    }
+                  } else {
+                    this.ZRAM[location - 65024] = value;
+                    if ((location > 0xFF40) && (location < 0xFF4A)) {
+                      if (location == 0xFF41) {
+                        this.LCDStatIns[0] = Math.floor(value / 8) & 1;
+                        this.LCDStatIns[1] = Math.floor(value / 16) & 1;
+                        this.LCDStatIns[2] = Math.floor(value / 32) & 1;
+                        this.LCDStatIns[3] = Math.floor(value / 64) & 1;
+                      } else {
+                        if (location == 0xFF46) {
+                          this.OAMTransfer(value);
+                        } else if (location == 0xFF47) {
+                          this.Pallete[0] = ScreenColours[this.ZRAM[327] % 4];
+                          this.Pallete[1] = ScreenColours[Math.floor(this.ZRAM[327] / 4) % 4];
+                          this.Pallete[2] = ScreenColours[Math.floor(this.ZRAM[327] / 16) % 4];
+                          this.Pallete[3] = ScreenColours[Math.floor(this.ZRAM[327] / 64) % 4];
+                        } else if (location == 0xFF48) {
+                          this.SpritePal[0] = ScreenColours[this.ZRAM[328] % 4];
+                          this.SpritePal[1] = ScreenColours[Math.floor(this.ZRAM[328] / 4) % 4];
+                          this.SpritePal[2] = ScreenColours[Math.floor(this.ZRAM[328] / 16) % 4];
+                          this.SpritePal[3] = ScreenColours[Math.floor(this.ZRAM[328] / 64) % 4];
+                        } else if (location == 0xFF49) {
+                          this.SpritePal[4] = ScreenColours[this.ZRAM[329] % 4];
+                          this.SpritePal[5] = ScreenColours[Math.floor(this.ZRAM[329] / 4) % 4];
+                          this.SpritePal[6] = ScreenColours[Math.floor(this.ZRAM[329] / 16) % 4];
+                          this.SpritePal[7] = ScreenColours[Math.floor(this.ZRAM[329] / 64) % 4];
+                        } else {
+                          
+                        }
+                      }
+                    } else {
+                      if (location == 0xFF0F) {
+                        this.iREQ = value;
+                      } else {
+                        if (location > 0xFF2F && location < 0xFF40) {
+                          this.WaveTable[(location - 65328) * 2] = Math.floor(value / 16);
+                          this.WaveTable[((location - 65328) * 2) + 1] = value % 16;
+                        } else {
+                          
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            } else {
+              if (location == 0xFFFF) {
+                this.iFLAGS = value;
+              } else {
+                this.ZRAM[location - 65024] = value;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.CGB_IO_write_byte = function(value, location) {
+  if (location == 0xFF69) {
+    var period = this.ZRAM[360] % 64;
+    this.CGBBGPalReg[period] = value;
+    period = Math.floor(period / 2);
+    var r = Math.round((Math.floor(this.CGBBGPalReg[(period * 2) + 1] / 4) % 32) * 8.225806451612904);
+    var g = Math.round((Math.floor(this.CGBBGPalReg[period * 2] / 32) + ((this.CGBBGPalReg[(period * 2) + 1] % 4) * 8)) * 8.225806451612904);
+    var b = Math.round((this.CGBBGPalReg[period * 2] % 32) * 8.225806451612904);
+    if (r > 255) r = 255;
+    if (r < 0) r = 0;
+    if (g > 255) g = 255;
+    if (g < 0) g = 0;
+    if (b > 255) b = 255;
+    if (b < 0) b = 0;
+    this.CGBBGPalCol[period] = r + (g * 256) + (b * 65536);
+    if (Math.floor(this.ZRAM[360] / 128) == 1) {
+      this.ZRAM[360] = ((this.ZRAM[360] + 1) % 64) + 128;
+    }
+  } else {
+    if (location == 0xFF6B) {
+      var period = this.ZRAM[362] % 64;
+      this.CGBSprPalReg[period] = value;
+      period = Math.floor(period / 2);
+      var r = Math.round((Math.floor(this.CGBSprPalReg[(period * 2) + 1] / 4) % 32) * 8.225806451612904);
+      var g = Math.round((Math.floor(this.CGBSprPalReg[period * 2] / 32) + ((this.CGBSprPalReg[(period * 2) + 1] % 4) * 8)) * 8.225806451612904);
+      var b = Math.round((this.CGBSprPalReg[period * 2] % 32) * 8.225806451612904);
+      if (r > 255) r = 255;
+      if (r < 0) r = 0;
+      if (g > 255) g = 255;
+      if (g < 0) g = 0;
+      if (b > 255) b = 255;
+      if (b < 0) b = 0;
+      this.CGBSprPalCol[period] = r + (g * 256) + (b * 65536);
+      if (Math.floor(this.ZRAM[362] / 128) == 1) {
+        this.ZRAM[362] = ((this.ZRAM[362] + 1) % 64) + 128;
+      }
+    } else {
+      if (location == 0xFF51) {
+        this.CGBDMA[3] = (value * 256) + (this.CGBDMA[3] % 256);
+      } else {
+        if (location == 0xFF52) {
+          this.CGBDMA[3] = (Math.floor(value / 16) * 16) + (Math.floor(this.CGBDMA[3] / 256) * 256);
+        } else {
+          if (location == 0xFF53) {
+            this.CGBDMA[4] = ((value * 256) + (this.CGBDMA[4] % 256)) % 8192;
+          } else {
+            if (location == 0xFF54) {
+              this.CGBDMA[4] = (Math.floor(value / 16) * 16) + (Math.floor(this.CGBDMA[4] / 256) * 256);
+            } else {
+              if (location == 0xFF55) {
+                if (((this.CGBDMA[0] + this.CGBDMA[1]) == 2) && (Math.floor(value / 128) == 0)) {
+                  this.CGBDMA[0] = 0;
+                } else {
+                  this.CGBDMA[0] = 1;
+                  this.CGBDMA[1] = Math.floor(value / 128);
+                  this.CGBDMA[2] = ((value % 128) + 1) * 16;
+                }
+              } else {
+                if (location == 0xFF70) {
+                  if ((value % 8) == 0) {
+                    this.ZRAM[location - 65024] = 1;
+                  } else {
+                    this.ZRAM[location - 65024] = value % 8;
+                  }
+                } else {
+                  if (location == 0xFF4F) {
+                    this.ZRAM[location - 65024] = value % 2;
+                  } else {
+
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.MBCWriteHandler = function(pointer, value) {
+  if (this.MBC[0] == 0) {
+
+  } else {
+    if (this.MBC[0] == 1) {
+      if (pointer < 0x2000) {
+        if ((value & 15) == 0xA) {
+          this.MBC[4] = 1;
+        } else {
+          this.MBC[4] = 0;
+          this.MBC[7] = 0;
+        }
+      } else {
+        if (pointer < 0x4000) {
+          if (value == 0) {
+            this.MBC[5] = (Math.floor(this.MBC[5] / 32) * 32) + 1;
+          } else {
+            this.MBC[5] = (Math.floor(this.MBC[5] / 32) * 32) + (value % 32);
+          }
+        } else {
+          if (pointer < 0x6000) {
+            if (this.MBC[6] == 1) {
+              this.MBC[7] = value % 4;
+            } else {
+              this.MBC[5] = ((value % 4) * 32) + (this.MBC[5] % 32);
+            }
+          } else {
+            this.MBC[6] = value & 1;
+          }
+        }
+      }
+    } else {
+      if (this.MBC[0] == 3) {
+        if (pointer < 0x2000) {
+          if ((value & 15) == 0xA) {
+            this.MBC[4] = 1;
+          } else {
+            this.MBC[4] = 0;
+            this.MBC[7] = 0;
+          }
+        } else {
+          if (pointer < 0x4000) {
+            if (value == 0) {
+              this.MBC[5] = 1;
+            } else {
+              this.MBC[5] = value % 128;
+            }
+          } else {
+            if (pointer < 0x6000) {
+              this.MBC[7] = value % 4;
+            } else {
+
+            }
+          }
+        }
+      } else {
+        if (this.MBC[0] == 5) {
+          if (pointer < 0x2000) {
+            if ((value & 15) == 0xA) {
+              this.MBC[4] = 1;
+            } else {
+              this.MBC[4] = 0;
+              this.MBC[7] = 0;
+            }
+          } else {
+            if (pointer < 0x3000) {
+              this.MBC[5] = (Math.floor(this.MBC[5] / 256) * 256) + value;
+            } else {
+              if (pointer < 0x4000) {
+                this.MBC[5] = (this.MBC[5] & 0xff) + ((value & 1) * 256);
+              } else {
+                if (pointer < 0x6000) {
+                  this.MBC[7] = value & 15;
+                } else {
+
+                }
+              }
+            }
+          }
+        } else {
+
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.UpdateTile = function(tile) {
+  var tileLocation = Math.floor((tile - 32768) / 2);
+  var tilepixscan = ((tileLocation * 2) + 1) + (this.ZRAM[335] * 8192);
+  var bgmaploc = ((Math.floor((this.VRAM[tilepixscan - 1] & 0xff) / 128) & 1) + ((Math.floor((this.VRAM[tilepixscan] & 0xff) / 128) & 1) * 2)) + 1;
+  var bgxfine = bgmaploc;
+  var tilex = bgmaploc;
+  var tileoffesty = 128;
+  var lcdy = "";
+  var i = "";
+  var TileNumber = 1;
+  for (var _ = 0; _ < 7; _++) {
+    tileoffesty = tileoffesty / 2;
+    bgmaploc = ((Math.floor((this.VRAM[tilepixscan - 1] & 0xff) / tileoffesty) & 1) + ((Math.floor((this.VRAM[tilepixscan] & 0xff) / tileoffesty) & 1) * 2)) + 1;
+    if (!(bgmaploc == bgxfine)) {
+      lcdy += "" + bgxfine;
+      i += "" + TileNumber;
+      TileNumber = 0;
+      bgxfine = bgmaploc;
+    }
+    TileNumber++;
+  }
+  lcdy += "" + bgmaploc;
+  i += "" + TileNumber;
+  var t = this.Tiles[tileLocation + (this.ZRAM[335] * 3136)];
+  if (t) {
+    t.len = i;
+    t.p = lcdy;
+  }
+}
+GBCJS.prototype.NR = function(channel, register, value, addr) {
+  this.ZRAM[addr] = value;
+  if (register == 0) {
+    if (channel == 2 && value < 128) {
+      this.AudioEngine[(channel * 9) + 6] = 0;
+      this.AudioEngine[(channel * 9) + 7] = -1;
+      this.AudioEngineEnables[channel] = 0;
+    } else {
+
+    }
+  } else {
+    if (register == 1) {
+      if (channel == 2) {
+        this.AudioEngine[(channel * 9) + 4] = 256 - value;
+      } else {
+        this.AudioEngine[(channel * 9) + 4] = 64 - (value % 64);
+        if (!((channel == 3) || this.AudioEngineDutyCycle[channel] == Math.floor(value / 64))) {
+          this.AudioEngineDutyCycle[channel] = Math.floor(value / 64);
+          this.AudioEngine[(channel * 9) + 8] = 1;
+        }
+      }
+    } else {
+      if (register == 2) {
+        if (channel == 2) {
+          if (!(this.AudioEngine[(channel * 9) + 7] == -1)) {
+            this.AudioEngine[(channel * 9) + 6] = waveVols[Math.floor(value / 32) % 4];
+          }
+        } else {
+          this.AudioEngine[(channel * 9) + 5] = Math.floor(value / 16);
+          this.AudioEngine[(channel * 9) + 6] = (Math.floor(value / 16) / 16) * 100;
+        }
+      } else {
+        if (register == 3) {
+          this.UpdateFrequencyForChannel(channel, false);
+        } else {
+          this.UpdateFrequencyForChannel(channel, value > 127);
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.UpdateFrequencyForChannel = function(channel, trigger) {
+  if (channel == 3) {
+    this.AudioEngine[(channel * 9) + 1] = this.ZRAM[272 + ((channel * 5) + 3)];
+  } else {
+    this.AudioEngine[(channel * 9) + 1] = this.ZRAM[272 + ((channel * 5) + 3)] + ((this.ZRAM[272 + ((channel * 5) + 4)] % 8) * 256);
+  }
+  if (trigger) {
+    this.AudioEngineEnables[channel] = 1;
+    if (channel == 0) {
+      var period = Math.floor(this.ZRAM[272] / 16) % 8;
+      var shift = this.ZRAM[272] % 8;
+      if (period == 0) {
+        this.AudioEngine[2] = 8;
+      } else {
+        this.AudioEngine[2] = period;
+      }
+      if ((period + shift) > 0) {
+        this.AudioEngine[0] = 1;
+      } else {
+        this.AudioEngine[0] = 0;
+      }
+    }
+    if (this.AudioEngine[(channel * 9) + 4] == 0) {
+      if (channel == 2) {
+        this.AudioEngine[(channel * 9) + 4] = 256;
+      } else {
+        this.AudioEngine[(channel * 9) + 4] = 64;
+      }
+    }
+    this.AudioEngine[(channel * 9) + 3] = 0;
+    if (channel == 2) {
+      this.AudioEngine[(channel * 9) + 5] = Math.floor(this.ZRAM[282] / 128);
+      this.AudioEngine[(channel * 9) + 6] = waveVols[Math.floor(this.ZRAM[284] / 32) % 4];
+    } else {
+      this.AudioEngine[(channel * 9) + 5] = Math.floor(this.ZRAM[272 + ((channel * 5) + 2)] / 16);
+      this.AudioEngine[(channel * 9) + 6] = (this.AudioEngine[(channel * 9) + 5] / 16) * 100;
+    }
+    if (channel == 3) {
+      this.AudioEngine[(channel * 9) + 8] = 1;
+    }
+  }
+  if (channel == 3) {
+    var np = this.AudioEngine[(channel * 9) + 1];
+    if (!(this.NoiseChannelWidthMode == (((np % 16) > 7) ? 1 : 0))) {
+      this.NoiseChannelWidthMode = ((np % 16) > 7) ? 1 : 0;
+      this.AudioEngine[(channel * 9) + 8] = 1;
+    }
+    var nd = NoiseDivisorLookup[np % 8] * (1 << Math.floor(np / 16));
+    this.AudioEngine[(channel * 9) + 7] = 524228 / nd;
+  } else {
+    this.AudioEngine[(channel * 9) + 7] = 524228 / ((2048 - this.AudioEngine[(channel * 9) + 1]) * 4);
+  }
+}
+GBCJS.prototype.OAMTransfer = function(location) {
+  var oamread = location * 256;
+  for (var i = 0; i < 159; i++) {
+    this.ZRAM[i] = this.MMU_read_byte(oamread++);
+  }
+}
+GBCJS.prototype.CGB_DMA_Transfer = function(length) {
+  for (var _ = 0; _ < length; _++) {
+    var lastmemory = this.MMU_read_byte(this.CGBDMA[3]);
+    this.MMU_write_byte(lastmemory, this.CGBDMA[4] + 32768);
+    this.CGBDMA[3]++;
+    this.CGBDMA[4]++;
+  }
+  this.CGBDMA[2] -= length;
+  if (!(this.CGBDMA[2] > 0 && this.CGBDMA[4] < 0x2000)) {
+    this.CGBDMA[0] = 0;
+  }
+}
+GBCJS.prototype.step_cpu = function() {
+  var lastmemory = this.MMU_read_byte(this.PC);
+  this.PC++;
+  var currenttop = OP_Command[lastmemory];
+  var instruction = Instruction_ID_Lookup[lastmemory];
+  if (instruction < 16) {
+    if (instruction < 8) {
+      if (instruction < 4) {
+        if (instruction < 2) {
+          if (instruction < 1) {
+            this._8bitLD(currenttop[1], currenttop[2]);
+          } else {
+            this._8bitLD(currenttop[3], currenttop[4]);
+            this._8bitLD(currenttop[1], currenttop[2]);
+          }
+        } else {
+          if (instruction < 3) {
+            this._8bitADD(currenttop[1], currenttop[2]);
+          } else {
+            this._8bitSUB(currenttop[1], currenttop[2]);
+          }
+        }
+      } else {
+        if (instruction < 6) {
+          if (instruction < 5) {
+            this._8bitSUB(currenttop[1], "y");
+          } else {
+            this.JUMP(currenttop[1], currenttop[2], currenttop[3]);
+          }
+        } else {
+          if (instruction < 7) {
+            this.RST(currenttop[1]);
+          } else {
+            this.RST_if_flag(currenttop[1], currenttop[2], currenttop[3]);
+          }
+        }
+      }
+    } else {
+      if (instruction < 12) {
+        if (instruction < 10) {
+          if (instruction < 9) {
+            this.enableIterrupts = +currenttop[1];
+          } else {
+            this.JR_if_flag(currenttop[2], currenttop[3]);
+          }
+        } else {
+          if (instruction < 11) {
+            this.SPLD();
+          } else {
+            this._8bit_INC_DEC(currenttop[1], 1);
+          }
+        }
+      } else {
+        if (instruction < 14) {
+          if (instruction < 13) {
+            this._8bit_INC_DEC(currenttop[1], -1);
+          } else {
+            this.ParamlessInstruction(currenttop[1]);
+          }
+        } else {
+          if (instruction < 15) {
+            this._16bit_INC_DEC(currenttop[1], 1);
+          } else {
+            this._16bit_INC_DEC(currenttop[1], -1);
+          }
+        }
+      }
+    }
+  } else {
+    if (instruction < 24) {
+      if (instruction < 20) {
+        if (instruction < 18) {
+          if (instruction < 17) {
+            this.PointerLD(currenttop[1], currenttop[2], currenttop[3]);
+          } else {
+            this.LD_SP_to_literal_address();
+          }
+        } else {
+          if (instruction < 19) {
+            this.AND(currenttop[1]);
+          } else {
+            this.OR(currenttop[1]);
+          }
+        }
+      } else {
+        if (instruction < 22) {
+          if (instruction < 21) {
+            this.XOR(currenttop[1]);
+          } else {
+            this.LDH(currenttop[1], currenttop[2]);
+          }
+        } else {
+          if (instruction < 23) {
+            this.CALL_if_flag(currenttop[2], currenttop[3]);
+          } else {
+            this.SelectValueToPUSH(currenttop[1]);
+            this.Cycles += 8;
+          }
+        }
+      }
+    } else {
+      if (instruction < 28) {
+        if (instruction < 26) {
+          if (instruction < 25) {
+            this._16bit_POP(currenttop[1]);
+            this.Cycles += 8;
+          } else {
+            this.RL_R(1, currenttop[1], currenttop[2]);
+            this.Flags[0] = 0;
+          }
+        } else {
+          if (instruction < 27) {
+            this.ADD_HL_16bit(currenttop[1]);
+          } else {
+            this.Special_SP_instructions_extraordinare(currenttop[1]);
+          }
+        }
+      } else {
+        if (instruction < 30) {
+          if (instruction < 29) {
+            this.PREFIX_CB();
+          } else {
+            this.Halted = 1;
+          }
+        } else {
+          if (instruction < 31) {
+            if (lastmemory == 16) {
+              if ((this.CGB == 1) && ((this.ZRAM[333] & 1) == 1)) {
+                if (this.CPUSpeed == 1) {
+                  this.CPUSpeed = 2;
+                } else {
+                  this.CPUSpeed = 1;
+                }
+                this.ZRAM[333] = 0;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype._8bitLD = function(destination, value) {
+  var result = 0;
+  if (value == "l" || value == "L") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+  } else {
+    if (value == "m" || value == "M") {
+      result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+      this.Cycles += 4;
+    } else {
+      if (value == "h" || value == "H") {
+        result = this.MMU_read_byte(this.PC);
+        this.PC++;
+        var r = this.MMU_read_byte(this.PC);
+        this.PC++;
+        var r2 = this.MMU_read_byte((r * 256) + result);
+        result = r2;
+        this.Cycles += 12;
+      } else {
+        result = this.Registers[value - 1];
+      }
+    }
+  }
+  if (destination == "m" || destination == "M") {
+    this.MMU_write_byte(result, (this.Registers[5] * 256) + this.Registers[6]);
+  } else {
+    if (destination == "h" || destination == "H") {
+      var temp = this.MMU_read_byte(this.PC);
+      this.PC++;
+      var temp2 = this.MMU_read_byte(this.PC);
+      this.PC++;
+      this.MMU_write_byte(result, (temp2 * 256) + temp);
+      this.Cycles += 12;
+    } else {
+      this.Registers[destination - 1] = result;
+    }
+  }
+}
+GBCJS.prototype._8bitADD = function(value, carry) {
+  var result = 0;
+  if (value == "l" || value == "L") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+  } else {
+    if (value == "m" || value == "M") {
+      result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+      this.Cycles += 4;
+    } else {
+      result = this.Registers[value - 1];
+    }
+  }
+  if (carry == "c" || carry == "C") {
+    this.Flags[2] = Math.floor((((result & 15) + (this.Registers[0] & 15)) + this.Flags[3]) / 16);
+    result += this.Flags[3];
+  } else {
+    this.Flags[2] = Math.floor(((result & 15) + (this.Registers[0] & 15)) / 16);
+  }
+  result += this.Registers[0];
+  this.Flags[1] = 0;
+  if (result > 255) {
+    this.Flags[3] = 1;
+    result -= 256;
+  } else {
+    this.Flags[3] = 0;
+  }
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Registers[0] = result;
+}
+GBCJS.prototype._8bitSUB = function(value, CP) {
+  var result = 0;
+  if (value == "l" || value == "L") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+  } else {
+    if (value == "m" || value == "M") {
+      result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+      this.Cycles += 4;
+    } else {
+      result = this.Registers[value - 1];
+    }
+  }
+  if (CP == "c" || CP == "C") {
+    this.Flags[2] = Math.floor(((((this.Registers[0] & 15) - (result & 15)) - this.Flags[3]) & 31) / 16);
+    result = (this.Registers[0] - result) - this.Flags[3];
+  } else {
+    this.Flags[2] = Math.floor((((this.Registers[0] & 15) - (result & 15)) & 31) / 16);
+    result = this.Registers[0] - result;
+  }
+  this.Flags[1] = 1;
+  if (result < 0) {
+    this.Flags[3] = 1;
+    result += 256;
+  } else {
+    this.Flags[3] = 0;
+  }
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  if (CP != "y") {
+    this.Registers[0] = result;
+  }
+}
+GBCJS.prototype.JUMP = function(location, flag, value) {
+  this.Cycles += 8;
+  if (((flag == "x") || (flag == "X"))|| (this.Flags[flag - 1] == value)) {
+    this.Cycles += 4;
+    if (location == "l") {
+      var result = this.MMU_read_byte(this.PC);
+      this.PC++;
+      var result2 = this.MMU_read_byte(this.PC);
+      this.PC = (result2 * 256) + result;
+    } else {
+      this.PC = (this.Registers[5] * 256) + this.Registers[6];
+      this.Cycles -= 4;
+    }
+  } else {
+    if (location == "l") {
+      this.PC += 2;
+      this.Cycles -= 4;
+    }
+  }
+}
+GBCJS.prototype.RST = function(value) {
+  this._16bit_PUSH(this.PC);
+  this.PC = ((+value) || 0) * 8;
+  this.Cycles += 16;
+}
+GBCJS.prototype.RST_if_flag = function(flag, value, interrupt) {
+  this.Cycles += 4;
+  if (flag == "t" || flag == "T") {
+    this._16bit_POP("p");
+    if (interrupt == "i") {
+      this.enableIterrupts = 1;
+    }
+  } else {
+    this.Cycles += 4;
+    if (this.Flags[flag - 1] == value) {
+      this._16bit_POP("p");
+    }
+  }
+}
+GBCJS.prototype.JR_if_flag = function(flag, value) {
+  this.Cycles += 4;
+  var r = this.MMU_read_byte(this.PC);
+  this.PC++;
+  if (((flag == "x") || (flag == "X")) || (this.Flags[flag - 1] == value)) {
+    this.Cycles += 4;
+    if (r > 127) {
+      r -= 256;
+    }
+    this.PC = (this.PC + r) & 0xffff;
+  }
+}
+GBCJS.prototype.SPLD = function() {
+  this.Cycles += 8;
+  var result = this.MMU_read_byte(this.PC);
+  this.PC++;
+  var result2 = this.MMU_read_byte(this.PC);
+  this.PC++;
+  this.SP = (result2 * 256) + result;
+}
+GBCJS.prototype._8bit_INC_DEC = function(value, neq) {
+  var result = 0;
+  if (value == "m" || value == "M") {
+    var r = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 8;
+    result = (r + neq) & 0xff;
+    this.Flags[2] = Math.floor((((r & 15) + neq) & 31) / 16);
+    this.MMU_write_byte(result, (this.Registers[5] * 256) + this.Registers[6]);
+  } else {
+    this.Flags[2] = Math.floor((((this.Registers[value - 1] & 15) + neq) & 31) / 16);
+    result = (this.Registers[value - 1] + neq) & 0xff;
+    this.Registers[value - 1] = result;
+  }
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Flags[1] = Math.round((1 - neq) / 2);
+}
+GBCJS.prototype.ParamlessInstruction = function(id) {
+  if (id == "^") {
+    this.Flags[1] = 0;
+    this.Flags[2] = 0;
+    this.Flags[3] = 1;
+  } else {
+    if (id == "#") {
+      this.Flags[3] = 1 - this.Flags[3];
+      this.Flags[1] = 0;
+      this.Flags[2] = 0;
+    } else {
+      if (id == "c" || id == "C") {
+        this.Registers[0] = 255 - this.Registers[0];
+        this.Flags[1] = 1;
+        this.Flags[2] = 1;
+      } else {
+        if (id == ".") {
+          var result = this.Registers[0];
+          if (this.Flags[1] == 0) {
+            if ((this.Flags[3] == 1) || (result > 0x99)) {
+              result += 96;
+              this.Flags[3] = 1;
+            }
+            if ((this.Flags[2] == 1) || ((result & 15) > 9)) {
+              result += 6;
+              this.Flags[2] = 0;
+            }
+          } else {
+            if (this.Flags[2] == 1) {
+              result -= 6;
+            }
+            if (this.Flags[3] == 1) {
+              result -= 96;
+            }
+          }
+          this.Flags[2] = 0;
+          result = result & 0xff;
+          if (result == 0) {
+            this.Flags[0] = 1;
+          } else {
+            this.Flags[0] = 0;
+          }
+          this.Registers[0] = result;
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype._16bit_INC_DEC = function(value, inc) {
+  var result = 0;
+  if (value == "S") {
+    if (inc == 1) {
+      this.SP = (this.SP + 1) & 0xffff;
+    } else {
+      this.SP = (this.SP - 1) & 0xffff;
+    }
+  } else {
+    if (inc == 1) {
+      result = (((this.Registers[value - 1] * 256) + this.Registers[value]) + 1) & 0xffff;
+    } else {
+      result = (((this.Registers[value - 1] * 256) + this.Registers[value]) - 1) & 0xffff;
+    }
+    this.Registers[value - 1] = Math.floor(result / 256);
+    this.Registers[value] = result & 0xff;
+  }
+}
+GBCJS.prototype.PointerLD = function(dest, value, inc) {
+  this.Cycles += 4;
+  if (dest == 1) {
+    var __ = this.MMU_read_byte((this.Registers[value - 1] * 256) + this.Registers[value]);
+    this.Registers[0] = __;
+    if (value == 6) {
+      this._16bit_INC_DEC(6, inc);
+    }
+  } else {
+    this.MMU_write_byte(this.Registers[0], (this.Registers[dest - 1] * 256) + this.Registers[dest]);
+    if (dest == 6) {
+      this._16bit_INC_DEC(6, inc);
+    }
+  }
+}
+GBCJS.prototype.LD_SP_to_literal_address = function() {
+  var result = this.MMU_read_byte(this.PC);
+  this.PC++;
+  var r = this.MMU_read_byte(this.PC);
+  this.PC++;
+  result = (r * 256) + result;
+  this.MMU_write_byte(this.SP & 0xff, result);
+  this.MMU_write_byte(Math.floor(this.SP / 256), result + 1);
+  this.Cycles += 16;
+}
+GBCJS.prototype.AND = function(arg) {
+  var result = 0;
+  if (arg == "l") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+  } else {
+    if (arg == "m") {
+      result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+      this.Cycles += 4;
+    } else {
+      result = this.Registers[arg - 1];
+    }
+  }
+  result = this.Registers[0] & result;
+  this.Flags[2] = 1;
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Registers[0] = result;
+  this.Flags[1] = 0;
+  this.Flags[3] = 0;
+}
+GBCJS.prototype.OR = function(arg) {
+  var result = 0;
+  if (arg == "l") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+  } else {
+    if (arg == "m") {
+      result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+      this.Cycles += 4;
+    } else {
+      result = this.Registers[arg - 1];
+    }
+  }
+  result = this.Registers[0] | result;
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Registers[0] = result;
+  this.Flags[1] = 0;
+  this.Flags[2] = 0;
+  this.Flags[3] = 0;
+}
+GBCJS.prototype.XOR = function(arg) {
+  var result = 0;
+  if (arg == "l") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+  } else {
+    if (arg == "m") {
+      result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+      this.Cycles += 4;
+    } else {
+      result = this.Registers[arg - 1];
+    }
+  }
+  result = this.Registers[0] ^ result;
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Registers[0] = result;
+  this.Flags[1] = 0;
+  this.Flags[2] = 0;
+  this.Flags[3] = 0;
+}
+GBCJS.prototype.LDH = function(dest, value) {
+  var result = 0;
+  this.Cycles += 4;
+  if (value == "l") {
+    result = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 4;
+    var r2 = this.MMU_read_byte(65280 + result);
+    this.Registers[0] = r2;
+  } else {
+    if (dest == 3) {
+      this.MMU_write_byte(this.Registers[0], 65280 + this.Registers[2]);
+    } else {
+      if (dest == 1) {
+        var r2 = this.MMU_read_byte(65280 + this.Registers[2]);
+        this.Registers[0] = r2;
+      } else {
+        result = this.MMU_read_byte(this.PC);
+        this.PC++;
+        this.Cycles += 4;
+        this.MMU_write_byte(this.Registers[0], 65280 + result);
+      }
+    }
+  }
+}
+GBCJS.prototype.CALL_if_flag = function(flag, value) {
+  this.Cycles += 8;
+  if ((flag == "x") || (this.Flags[flag - 1] == value)) {
+    this.Cycles += 4;
+    var r1 = this.MMU_read_byte(this.PC);
+    this.PC++;
+    var r2 = this.MMU_read_byte(this.PC);
+    this._16bit_PUSH(this.PC + 1);
+    this.PC = (r2 * 256) + r1;
+  } else {
+    this.PC += 2;
+  }
+}
+GBCJS.prototype.SelectValueToPUSH = function(value) {
+  if (value == 1) {
+    this._16bit_PUSH((this.Registers[0] * 256) + (this.Flags[0] * 128) + (this.Flags[1] * 64) + (this.Flags[2] * 32) + (this.Flags[3] * 16));
+  } else {
+    this._16bit_PUSH((this.Registers[value - 1] * 256) + this.Registers[value]);
+  }
+}
+GBCJS.prototype._16bit_PUSH = function(value) {
+  this.SP = (this.SP - 2) & 0xffff;
+  this.MMU_write_byte(value & 0xff, this.SP);
+  this.MMU_write_byte(Math.floor(value / 256), this.SP + 1);
+}
+GBCJS.prototype._16bit_POP = function(destination) {
+  var result = this.MMU_read_byte(this.SP);
+  var lastmemory = this.MMU_read_byte(this.SP + 1);
+  this.SP = (this.SP + 2) & 0xffff;
+  if (destination == "p") {
+    this.PC = (lastmemory * 256) + result;
+  } else {
+    if (destination == 1) {
+      this.Registers[destination - 1] = lastmemory;
+      this.Flags[0] = Math.floor(result / 128) & 1;
+      this.Flags[1] = Math.floor(result / 64) & 1;
+      this.Flags[2] = Math.floor(result / 32) & 1;
+      this.Flags[3] = Math.floor(result / 16) & 1;
+    } else {
+      this.Registers[destination - 1] = lastmemory;
+      this.Registers[destination] = result;
+    }
+  }
+}
+GBCJS.prototype.RL_R = function(value, type, shiftdir) {
+  var result = 0;
+  if (value == "m") {
+    result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 4;
+  } else {
+    result = this.Registers[value - 1];
+  }
+  if (shiftdir == "r") {
+    if (type == "c") {
+      this.Flags[3] = result & 1;
+      result = Math.floor(result / 2) + (this.Flags[3] * 128);
+    } else {
+      if (type == "a") {
+        this.Flags[3] = result & 1;
+        result = Math.floor(result / 2) + ((Math.floor(result / 128) & 1) * 128);
+      } else {
+        if (type == "l") {
+          this.Flags[3] = result & 1;
+          result = Math.floor(result / 2);
+        } else {
+          var r = this.Flags[3] * 128;
+          this.Flags[3] = result & 1;
+          result = Math.floor(result / 2) + r;
+        }
+      }
+    }
+  } else {
+    if (type == "c") {
+      this.Flags[3] = Math.floor(result / 128);
+      result = ((result * 2) & 0xff) + this.Flags[3];
+    } else {
+      if (type == "a") {
+        this.Flags[3] = Math.floor(result / 128);
+        result = (result * 2) & 0xff;
+      } else {
+        var r = this.Flags[3];
+        this.Flags[3] = Math.floor(result / 128);
+        result = ((result * 2) & 0xff) + r;
+      }
+    }
+  }
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Flags[1] = 0;
+  this.Flags[2] = 0;
+  if (value == "m") {
+    this.MMU_write_byte(result, (this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 4;
+  } else {
+    this.Registers[value - 1] = result;
+  }
+}
+GBCJS.prototype.ADD_HL_16bit = function(value) {
+  var result = (this.Registers[5] * 256) + this.Registers[6];
+  if (value == "S" || value == "s") {
+    this.Flags[2] = Math.floor(((result % 4096) + (this.SP % 4096)) / 4096);
+    result += this.SP;
+  } else {
+    var r = (this.Registers[value - 1] * 256) + this.Registers[value];
+    this.Flags[2] = Math.floor(((result % 4096) + (r % 4096)) / 4096);
+    result += r;
+  }
+  if (result > 65535) {
+    result -= 65536;
+    this.Flags[3] = 1;
+  } else {
+    this.Flags[3] = 0;
+  }
+  this.Flags[1] = 0;
+  this.Registers[5] = Math.floor(result / 256);
+  this.Registers[6] = result & 255;
+}
+GBCJS.prototype.Special_SP_instructions_extraordinare = function(type) {
+  if (type == "h" || type == "H") {
+    var r = this.MMU_read_byte(this.PC);
+    this.PC++;
+    this.Cycles += 8;
+    if (r > 127) {
+      r -= 256;
+    }
+    var result = (this.SP + r) & 0xffff;
+    this.Flags[0] = 0;
+    this.Flags[1] = 0;
+    this.Flags[2] = Math.floor(((this.SP & 15) + (r & 15)) / 16);
+    this.Flags[3] = Math.floor(((this.SP & 255) + (r & 255)) / 256);
+    this.Registers[5] = Math.floor(result / 256);
+    this.Registers[6] = result & 255;
+  } else {
+    if (type == "l" || type == "L") {
+      this.Cycles += 4;
+      this.SP = (this.Registers[5] * 256) + this.Registers[6];
+    } else {
+      var r = this.MMU_read_byte(this.PC);
+      this.PC++;
+      this.Cycles += 12;
+      if (r > 127) {
+        r -= 256;
+      }
+      this.Flags[0] = 0;
+      this.Flags[1] = 0;
+      this.Flags[2] = Math.floor(((this.SP & 15) + (r & 15)) / 16);
+      this.Flags[3] = Math.floor(((this.SP & 255) + (r & 255)) / 256);
+      this.SP = (this.SP + r) & 0xffff;
+    }
+  }
+}
+GBCJS.prototype.PREFIX_CB = function() {
+  var lastmemory = this.MMU_read_byte(this.PC);
+  this.PC++;
+  var currenttop = PrefixCBlookup[lastmemory];
+  var instruction = currenttop[0];
+  if (instruction == "s") {
+    this.RL_R(currenttop[1], currenttop[2], currenttop[3]);
+  } else {
+    if (instruction == "~") {
+      this.SWAP(currenttop[1]);
+    } else {
+      if (instruction == "=") {
+        this.SET_BIT(currenttop[1], currenttop[2], currenttop[3]);
+      } else {
+        if (instruction == "b") {
+          this.BIT(currenttop[1], currenttop[2]);
+        }
+      }
+    }
+  }
+}
+GBCJS.prototype.SWAP = function(value) {
+  var result = 0;
+  if (value == "m") {
+    result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 8;
+  } else {
+    result = this.Registers[value - 1];
+  }
+  result = Math.floor(result / 16) + ((result & 15) * 16);
+  if (result == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  if (value == "m") {
+    this.MMU_write_byte(result, (this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 4;
+  } else {
+    this.Registers[value - 1] = result;
+  }
+  this.Flags[1] = 0;
+  this.Flags[2] = 0;
+  this.Flags[3] = 0;
+}
+GBCJS.prototype.SET_BIT = function(bit, value, _1_0) {
+  var result = 0;
+  if (value == "m") {
+    result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 4;
+  } else {
+    result = this.Registers[value - 1];
+  }
+  var gfd = Math.floor(result / BitDivisorTable[bit]) & 1;
+  if (!(gfd == _1_0)) {
+    if (_1_0 == 0) {
+      result -= BitDivisorTable[bit];
+    } else {
+      result += BitDivisorTable[bit];
+    }
+  }
+  if (value == "m") {
+    this.MMU_write_byte(result, (this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 4;
+  } else {
+    this.Registers[value - 1] = result;
+  }
+}
+GBCJS.prototype.BIT = function(test, value) {
+  var result = 0;
+  if (value == "m") {
+    result = this.MMU_read_byte((this.Registers[5] * 256) + this.Registers[6]);
+    this.Cycles += 4;
+  } else {
+    result = this.Registers[value - 1];
+  }
+  if ((Math.floor(result / BitDivisorTable[test]) & 1) == 0) {
+    this.Flags[0] = 1;
+  } else {
+    this.Flags[0] = 0;
+  }
+  this.Flags[1] = 0;
+  this.Flags[2] = 1;
+}
+        </script>
+        <script>
+            var strHexToData = function(dfgdfg) {
+                var rom = new Uint8Array(dfgdfg.length / 2);
+                for (var i = 0; i < dfgdfg.length; i+=2) {
+                    rom[i / 2] = +("0x" + dfgdfg[i] + dfgdfg[i+1]);
+                }
+                return rom;
+            }
+
+            var gdfdfgdfgdg = document.getElementById("gdfdfgdfgdg");
+            var ddgbc = document.getElementById("ddgbc");
+            ddgbc.style.display = "none";
+
+            var GB_ROM_DATA = null;
+
+            var GB_STATE = null;
+
+            var playerArea = document.getElementById('player_area');
+            var gb_menu_button = document.getElementById('gb_menu_button');
+            var menu_gb = document.getElementById('menu_gb');
+            var sbgb_sb = document.getElementById('sbgb_sb');
+            var gb_frameskip_gb = document.getElementById('gb_frameskip_gb');
+            var gb_speed_gb = document.getElementById('gb_speed_gb');
+            var gb_scale_gb = document.getElementById('gb_scale_gb');
+            var gdfdfgdfgdg_atmkb = document.getElementById('gdfdfgdfgdg_atmkb');
+            var txtgbrom = document.getElementById('txtgbrom');
+
+            var gbctitle = document.getElementById('gbctitle');
+            gbctitle.textContent = "GBC.js By EAXDMLPSXF";
+
+            var wavescene = document.getElementById("wavescene");
+            var ctx = wavescene.getContext("2d");
+
+            function gbmenubtn() {
+                if (gbPaused) {
+                    gbSetPaused(false);
+                } else {
+                    gbSetPaused(true);
+                }
+            }
+
+            function _fullscreenchange() {
+                if (typeof document.fullscreen === 'boolean' && document.fullscreen !== sle) {
+                    closedemo();
+                } else if (typeof document.webkitIsFullScreen === 'boolean' && document.webkitIsFullScreen !== sle) {
+                    closedemo();
+                }
+            }
+
+            var minHH = 18;
+
+            var scaleMode = 1;
+
+            var sle = false;
+
+            gb_menu_button.onclick = gbmenubtn;
+            
+            var gbc = new GBCJS();
+            var gbscene = gbc.canvas;
+            gbscene.style.imageRendering = "pixelated";
+            gbc.initSystem();
+            gbseteram();
+            playerArea.appendChild(gbscene);
+
+            sbgb_sb.onclick = function() {
+                gbc.SkipBIOS = !gbc.SkipBIOS;
+                if (gbc.SkipBIOS) {
+                    sbgb_sb.innerHTML = "Skip BIOS: ON";
+                } else {
+                    sbgb_sb.innerHTML = "Skip BIOS: OFF";
+                }
+            }
+
+            gb_frameskip_gb.addEventListener("change", function() {
+                gbc.Frameskip = +gb_frameskip_gb.value;
+            });
+
+            gb_speed_gb.addEventListener("change", function() {
+                gbc.emulatorSpeed = +gb_speed_gb.value;
+            });
+
+            gb_scale_gb.addEventListener("change", function() {
+                scaleMode = +gb_scale_gb.value;
+                __resize_();
+            });
+
+            var gbPaused = true;
+
+            var dataToStrHex = function(data) {
+                var result = [];
+                for (var i = 0; i < data.length; i++) {
+                    var byte = data[i] & 0xff;
+                    var b1 = byte & 0x0f;
+                    var b2 = (byte >> 4) & 0x0f;
+                    result.push(b2.toString(16));
+                    result.push(b1.toString(16));
+                }
+                return result.join("");
+            }
+
+            function gdfgdg_emptyrom() {
+                gbc.setRom(new Uint8Array(0));
+            }
+            function gdfgdg_emptyflag() {
+                gbc.Flags = new Float64Array(0);
+            }
+
+            function gdfgdg_load_eram() {
+                gbreset();
+                gbseteram();
+                gbSetPaused(false);
+            }
+            function gbseteram() {
+                try {
+                    var dfgdfg = localStorage.getItem("atgb_eram_" + gbc.name) || "";
+                    gbc.ERAM = strHexToData(dfgdfg);
+                } catch(e) {
+                    console.log(e);
+                }
+            }
+            function gdfgdg_save_eram() {
+                localStorage.setItem("atgb_eram_" + gbc.name, dataToStrHex(gbc.ERAM));
+            }
+
+            function gbreset() {
+                if (GB_ROM_DATA) gbc.setRom(GB_ROM_DATA);
+                gbc.initSystem();
+                menu_gb.style.display = "none";
+            }
+
+            function gdfgdg_reset() {
+                gbreset();
+                gbSetPaused(false);
+            }
+
+            function gbLoadRom(rom) {
+                ddgbc.style.display = "none";
+                GB_ROM_DATA = rom;
+                gbreset();
+                gbseteram();
+                gbSetPaused(false);
+            }
+
+            function downloadgbc() {
+                if (GB_ROM_DATA) {
+                    var b = new Blob([GB_ROM_DATA]);
+                    var a = document.createElement("a");
+                    a.href = URL.createObjectURL(b);
+                    a.download = gbc.name + "." + (gbc.CGB ? "gbc" : "gb");
+                    a.click();
+                }
+            }
+
+            function gbloadurl() {
+                loadgburl(txtgbrom.value);
+            }
+
+            ddgbc.onclick = function() {
+                downloadgbc();
+            }
+
+            function loadgburl(url) {
+                var xhr = new XMLHttpRequest();
+                xhr.onload = function() {
+                    gbctitle.textContent = "GBC.js By EAXDMLPSXF";
+                    gbLoadRom(new Uint8Array(xhr.response));
+                    ddgbc.style.display = "";
+                }
+                xhr.responseType = "arraybuffer";
+                xhr.open("GET", url);
+                xhr.send();
+            }
+
+            
+            function __resize_() {
+                var iw = window.innerWidth;
+                var ih = window.innerHeight - minHH;
+                var w = 160;
+                var h = 144;
+                var sca = 1;
+                var fa = false;
+                if ((ih / h) > (iw / w)) {
+                    sca = iw / w;
+                    fa = true;
+                } else {
+                    sca = ih / h;
+                    fa = false;
+                }
+                var ww = w * sca;
+                var hh = h * sca;
+                if (scaleMode == 2) {
+                    ww = iw;
+                    hh = ih;
+                }
+                gbscene.style.width = ww + "px";
+                gbscene.style.height = hh + "px";
+                wavescene.width = iw;
+                wavescene.height = ih;
+                wavescene.style.top = minHH + "px";
+                wavescene.style.left = "0px";
+                if (fa) {
+                    playerArea.style.left = 0 + "px";
+                    playerArea.style.top = ((((ih - hh)) / 2) + minHH) + "px";
+                } else {
+                    playerArea.style.left = (((iw - ww)) / 2) + "px";
+                    playerArea.style.top = minHH + "px";
+                }
+            }
+
+            window.onresize = function() {
+                __resize_();
+            }
+
+            __resize_();
+
+            function opendemo() {
+                if (!sle) {
+                    gdfdfgdfgdg.style.display = "none";
+                    minHH = 0;
+                    if (document.body.requestFullScreenWithKeys) {
+                        document.body.requestFullScreenWithKeys();
+                    } else if (document.body.webkitRequestFullScreen) {
+                        document.body.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT);
+                    } else if (document.body.requestFullscreen) {
+                        document.body.requestFullscreen();
+                    }
+                    __resize_();
+                    sle = true;
+                }
+            }
+            function closedemo() {
+                if (sle) {
+                    gdfdfgdfgdg.style.display = "";
+                    minHH = 18;
+                    if (document.fullscreenElement === document.body || document.webkitFullscreenElement === document.body) {
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                        } else if (document.mozCancelFullScreen) {
+                            document.mozCancelFullScreen();
+                        } else if (document.webkitCancelFullScreen) {
+                            document.webkitCancelFullScreen();
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        }
+                    }
+                    __resize_();
+                    sle = false;
+                }
+            }
+
+            document.addEventListener('fullscreenchange', function() {_fullscreenchange()});
+            document.addEventListener('mozfullscreenchange', function() {_fullscreenchange()});
+            document.addEventListener('webkitfullscreenchange', function() {_fullscreenchange()});
+
+            function gbfullscreenbtn() {
+                if (sle) {
+                    closedemo();
+                } else {
+                    opendemo();
+                }
+            }
+
+            function gbjoykb(control, iskeydown) {
+                if (control == "down") {
+                    gbc.Input[0] = iskeydown ? 0 : 1;
+                }
+                if (control == "up") {
+                    gbc.Input[1] = iskeydown ? 0 : 1;
+                }
+                if (control == "left") {
+                    gbc.Input[2] = iskeydown ? 0 : 1;
+                }
+                if (control == "right") {
+                    gbc.Input[3] = iskeydown ? 0 : 1;
+                }
+                if (control == "start") {
+                    gbc.Input[4] = iskeydown ? 0 : 1;
+                }
+                if (control == "select") {
+                    gbc.Input[5] = iskeydown ? 0 : 1;
+                }
+                if (control == "B") {
+                    gbc.Input[6] = iskeydown ? 0 : 1;
+                }
+                if (control == "A") {
+                    gbc.Input[7] = iskeydown ? 0 : 1;
+                }
+            }
+
+            if (AT_MobileKB.isMobileOrTablet()) {
+                var atmkb = new AT_MobileKB(0, gdfdfgdfgdg_atmkb);
+                atmkb.callback = function(control, mousedown) {
+                    if (control == "gbc_js") {
+                        if (mousedown) {
+                            gbmenubtn();
+                        }
+                    } else {
+                        gbjoykb(control, mousedown);
+                    }
+                }    
+            }
+
+            window.addEventListener("keydown", function(e) {
+                if (e.keyCode == 70) {
+                    gbfullscreenbtn();
+                }
+                if (e.keyCode == 78) {
+                    if (wavescene.style.display == "none") {
+                        wavescene.style.display = "";
+                    } else {
+                        wavescene.style.display = "none";
+                    }
+                }
+                if (e.keyCode == 84) {
+                    gbc.turbo = true;
+                }
+                if (e.keyCode == 57) {
+                    gbc.ROM = [];
+                }
+                if (e.keyCode == 56) {
+                    gbc.Flags = new Uint8Array(0);
+                }
+                if (e.keyCode == 81) {
+                    GB_STATE = gbc.saveState();
+                }
+                if (e.keyCode == 87) {
+                    if (GB_STATE) {
+                        gbc.Flags = [];
+                        gbc.loadState(GB_STATE);
+                    }
+                }
+                if (e.keyCode == 80) {
+                    gdfgdg_playpause();
+                }
+                if (menu_gb.style.display == "none") {
+                    if (e.keyCode == 82) {
+                        gdfgdg_reset();
+                    }
+                    if (e.keyCode == 40) {
+                        gbc.Input[0] = 0;
+                    }
+                    if (e.keyCode == 38) {
+                        gbc.Input[1] = 0;
+                    }
+                    if (e.keyCode == 37) {
+                        gbc.Input[2] = 0;
+                    }
+                    if (e.keyCode == 39) {
+                        gbc.Input[3] = 0;
+                    }
+                    if (e.keyCode == 32) {
+                        gbc.Input[4] = 0;
+                    }
+                    if (e.keyCode == 67) {
+                        gbc.Input[5] = 0;
+                    }
+                    if (e.keyCode == 88) {
+                        gbc.Input[6] = 0;
+                    }
+                    if (e.keyCode == 90) {
+                        gbc.Input[7] = 0;
+                    }
+                }
+            });
+            window.addEventListener("keyup", function(e) {
+                if (e.keyCode == 84) {
+                    gbc.turbo = false;
+                }
+                if (e.keyCode == 40) {
+                    gbc.Input[0] = 1;
+                }
+                if (e.keyCode == 38) {
+                    gbc.Input[1] = 1;
+                }
+                if (e.keyCode == 37) {
+                    gbc.Input[2] = 1;
+                }
+                if (e.keyCode == 39) {
+                    gbc.Input[3] = 1;
+                }
+                if (e.keyCode == 32) {
+                    gbc.Input[4] = 1;
+                }
+                if (e.keyCode == 67) {
+                    gbc.Input[5] = 1;
+                }
+                if (e.keyCode == 88) {
+                    gbc.Input[6] = 1;
+                }
+                if (e.keyCode == 90) {
+                    gbc.Input[7] = 1;
+                }
+            });
+
+            var playedSound = false;
+
+            function gfhfhfh(H, type) {
+                var S = [];
+                if (type == 4) {
+                    for (var i = 0; i < H; i++) {
+                        S.push((i > (H / 4)) ? -0.5 : 0.5);
+                    }
+                } else if (type == 3) {
+                    for (var i = 0; i < H; i++) {
+                        S.push((i > (H / 4)) ? 0.5 : -0.5);
+                    }
+                } else {
+                    if (type == 2) {
+                       for (var i = 0; i < H; i++) {
+                            S.push((i > (H / 8)) ? 0.5 : -0.5);
+                        }
+                    } else {
+                        if (type == 1) {
+                            for (var i = 0; i < H; i++) {
+                                S.push((i > (H / 2)) ? 0.5 : -0.5);
+                            }
+                        } else {
+                            for (var i = 0; i < H; i++) {
+                                S.push((i - (H / 2)) / (H / 2));
+                            }
+                        }
+                    }
+                }
+                return S;
+            }
+
+            var channelPitch = [0, 0, 0, 0];
+            var channelI = [0, 0, 0, 0];
+            var channelLeftVolume = [0, 0, 0, 0];
+            var channelRightVolume = [0, 0, 0, 0];
+            var channelS = [[0], [0], gfhfhfh(32, 0), [0]];
+
+            var channelDutyCycle = [0, 0];
+
+            var wavDutyCycle = [gfhfhfh(100, 2), gfhfhfh(100, 3), gfhfhfh(100, 1), gfhfhfh(100, 4)];
+
+            var WaveNoise1 = [];
+            var WaveNoise2 = [];
+
+            var randomFactor = 1;
+            var LSFR = 0x7FFF;
+            var LSFRShifted = 0x3FFF;
+            for (var index = 0; index < 0x8000; ++index) {
+                randomFactor = 1 - (LSFR & 1);
+                WaveNoise1.push(randomFactor - 0.5);
+                LSFRShifted = LSFR >> 1;
+                LSFR = LSFRShifted | (((LSFRShifted ^ LSFR) & 0x1) << 14);
+            }
+            LSFR = 0x7F;
+            for (index = 0; index < 0x80; ++index) {
+                randomFactor = 1 - (LSFR & 1);
+                WaveNoise2.push(randomFactor - 0.5);
+                LSFRShifted = LSFR >> 1;
+                LSFR = LSFRShifted | (((LSFRShifted ^ LSFR) & 0x1) << 6);
+            }
+
+            channelS[0] = wavDutyCycle[0];
+            channelS[1] = wavDutyCycle[0];
+
+            var audioRunning = true;
+            var channelWav = [new Float32Array(1024), new Float32Array(1024), new Float32Array(1024), new Float32Array(1024)];
+            var outLen = 1024;
+            var outputLeft = new Float32Array(outLen);
+            var outputRight = new Float32Array(outLen);
+
+            var fgdgfdg = 0;
+            var sampleIndex = 2048;
+
+            function smindex() {
+                var ospeed = 44100 / audioContext.sampleRate;
+                for (var i = 0; i < 1024; i++) {
+                    var sampleLeft = 0;
+                    var sampleRight = 0;
+                    if (audioRunning) {
+                        var gd = sampleIndex % 1024;
+                        channelWav[0][gd] = 0;
+                        channelWav[1][gd] = 0;
+                        channelWav[2][gd] = 0;
+                        channelWav[3][gd] = 0;
+                        for (var ch = 0; ch < 4; ch++) {
+                            var ch_left = channelLeftVolume[ch];
+                            var ch_right = channelRightVolume[ch];
+                            var SquareWave = channelS[ch];
+                            var iwav = channelI[ch];
+                            if ((ch_left + ch_right) > 0) {
+                                iwav += ospeed * channelPitch[ch];
+                                iwav = iwav % SquareWave.length;
+                                var res = SquareWave[(iwav % SquareWave.length) | 0] || 0;
+                                var rg = (gd - 512) * (ospeed * channelPitch[ch]);
+                                rg = (rg - (SquareWave.length / 2)) % SquareWave.length;
+                                if (rg < 0) rg += SquareWave.length;
+                                var res2 = SquareWave[rg | 0] || 0;
+                                channelWav[ch][gd] += (res2 * ch_left) + (res2 * ch_right) / 2;
+                                sampleLeft += res * ch_left;
+                                sampleRight += res * ch_right;
+                            } else {
+                                iwav = 0;
+                            }
+                            channelI[ch] = iwav;
+                        }   
+                    }
+                    outputLeft[sampleIndex % outLen] = sampleLeft;
+                    outputRight[sampleIndex % outLen] = sampleRight;
+                    sampleIndex++;
+                }
+            }
+
+            function writeSampleData(evt) {
+                smindex();
+                var output1 = evt.outputBuffer.getChannelData(0);
+                var output2 = evt.outputBuffer.getChannelData(1);
+                for (var i = 0; i < 1024; i++) {
+                    if (audioRunning) {
+                        output1[i] = outputLeft[fgdgfdg % outLen];
+                        output2[i] = outputRight[fgdgfdg % outLen];
+                    } else {
+                        output1[i] = 0;
+                        output2[i] = 0;
+                    }
+                    fgdgfdg++;
+                }
+            }
+
+            var audioContext = new AudioContext();
+
+            var source = audioContext.createScriptProcessor(1024, 2, 2);
+            source.onaudioprocess = writeSampleData;
+            source.connect(audioContext.destination);
+
+            function loadGBFile(f) {
+                gbctitle.textContent = f.name || "";
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    var data = new Uint8Array(e.target.result);
+                    gbLoadRom(data);
+                };
+                reader.readAsArrayBuffer(f);
+            }
+
+            function gbopenrom() {
+                var sa = document.createElement('input');
+                sa.type = 'file';
+                sa.accept = '.gb, .gbc';
+                sa.addEventListener('change', function (e) {
+                    var file = e.target.files[0];
+                    if (!file) {
+                        return;
+                    }
+                    loadGBFile(file);
+                }, false);
+                sa.click();
+            }
+
+            function dropHandler(ev) {
+                ev.preventDefault();
+                if (ev.dataTransfer.items) {
+                    var item = ev.dataTransfer.items[0];
+                    if (item) {
+                        if (item.kind === 'file') {
+                            var file = item.getAsFile();
+                            loadGBFile(file);
+                        }
+                    };
+                }
+            }
+            function dragOverHandler(ev) {
+                ev.preventDefault();
+            }
+            window.addEventListener("drop", dropHandler);
+            window.addEventListener("dragover", dragOverHandler);
+
+            function playSound() {
+                if (audioContext.state == "running") {
+                    if (!playedSound) {
+                        var _source = audioContext.createBufferSource();
+                        _source.connect(source);
+                        _source.start();
+                        playedSound = true;    
+                    }
+                } else {
+                    audioContext.resume();
+                }
+            }
+
+            function gbSetPaused(p) {
+                gbPaused = p;
+                if (gbPaused) {
+                    menu_gb.style.display = "";
+                    playerArea.style.opacity = 0.33;
+                } else {
+                    menu_gb.style.display = "none";
+                    playerArea.style.opacity = 1;
+                }
+            }
+            
+            function gdfgdg_playpause() {
+                gbSetPaused(!gbPaused);
+            }
+
+            function drawWaveChannel() {
+                var glen = wavescene.height / 4;
+                ctx.clearRect(0, 0, wavescene.width, wavescene.height);
+                ctx.beginPath();
+                for (var ch = 0; ch < 4; ch++) {
+                    ctx.moveTo(0, (glen / 2) + (ch * glen));
+                    for (var i = 0; i < 256; i++) {
+                        var wavsample = channelWav[ch][((i / 256) * 1024) | 0] || 0;
+                        ctx.lineTo((i / 256) * wavescene.width, ((wavsample * (glen / 2)) + (glen / 2)) + (ch * glen));
+                    }
+                }
+                ctx.strokeStyle = "#fff";
+                ctx.stroke();
+            }
+
+            function stepAudio() {
+                var c2data = channelS[2];
+                for (var i = 0; i < 32; i++) {
+                    c2data[i] = (gbc.WaveTable[i] - 8) / 16;
+                }
+                if ((gbc.NoiseChannelWidthMode & 1) == 1) {
+                    channelS[3] = WaveNoise2;
+                } else {
+                    channelS[3] = WaveNoise1;
+                }
+                for (var ch = 0; ch < 4; ch++) {
+                    var volume = (gbc.AudioEngine[(ch * 9) + 6] / 100) * gbc.AudioEngineEnables[ch];
+                    if (volume > 1) volume = 1;
+                    volume /= 4;
+                    if (ch < 2) {
+                        if (channelDutyCycle[ch] != gbc.AudioEngineDutyCycle[ch]) {
+                            channelS[ch] = wavDutyCycle[gbc.AudioEngineDutyCycle[ch] % 4];
+                            channelDutyCycle[ch] = gbc.AudioEngineDutyCycle[ch];
+                        }
+                    }
+                    var freq = gbc.AudioEngine[(ch * 9) + 7];
+                    if (freq > 0) {
+                        if (ch == 3) {
+                            channelPitch[ch] = freq / 5440;
+                        } else {
+                            if (ch == 2) {
+                                channelPitch[ch] = (freq * 0.32) / 880;
+                            } else {
+                                channelPitch[ch] = freq / 440;
+                            }
+                        }    
+                    }
+                    channelLeftVolume[ch] = gbc.AudioEngineStereoLeft[ch] * volume;
+                    channelRightVolume[ch] = gbc.AudioEngineStereoRight[ch] * volume;
+                }
+                if (wavescene.style.display != "none") {
+                    drawWaveChannel();
+                }
+            }
+
+            var gbrunstate = 0;
+
+            setInterval(function() { 
+                if (!gbPaused && (!document.hidden && !document.msHidden && !document.mozHidden && !document.webkitHidden)) {
+                    audioRunning = true;
+                    if (gbrunstate == 0) {
+                        playSound();
+                        gbc.run();
+                        stepAudio();
+                        gbrunstate = 1;
+                    } else {
+                        gbrunstate = 0;
+                    }
+                } else {
+                    audioRunning = false;
+                }
+            }, 8);
+        </script>
+    </body>
+</html>

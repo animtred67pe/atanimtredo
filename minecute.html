@@ -1,6 +1,7 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 	<head>
-		<title>HDFGDG - Anim Tred Games</title>
+		<title>minecute - EAAQ HTMLs</title>
 		<style>
 			body {
 				margin: 0;
@@ -20,6 +21,11 @@
 		<div id="game"></div>
 		<div style="position: absolute; top: 5px; left: 5px; background-color: rgba(0, 0, 0, 0.5); padding: 10px;">
 			<div id="fps0">FPS: 60</div>
+		</div>
+		<div style="position: absolute; bottom: 5px; left: 5px; background-color: rgba(0, 0, 0, 0.5); padding: 10px;">
+			<label>Distance:</label>
+			<input type="range" id="fps1" value="12" min="8" max="32">
+			<label id="fps2">12</label>
 		</div>
 		<script>
 			class RenderCanvas2d {
@@ -48,24 +54,17 @@
 
 			const vs2 = `
 precision mediump float;
-
 uniform mat3 view_matrix;
-
 attribute vec2 position;
 attribute vec4 color;
-
 varying vec4 frag_color;
-
 void main() {
-    frag_color = vec4(color.xyz, color.w);
-
+   frag_color = vec4(color.xyz, color.w);
 	gl_Position = vec4((view_matrix * vec3(position, 1)).xy, 0.0, 1.0);
 }`;
 			const fs2 = `
 precision mediump float;
-
 varying vec4 frag_color;
-
 void main() {
    gl_FragColor = frag_color;
 }`;
@@ -162,12 +161,7 @@ void main() {
 			        canvas.height = 360;
 
 			        const gl = canvas.getContext('webgl', {
-			            alpha: true,
-			            antialias: true,
-			            depth: false,
-			            failIfMajorPerformanceCaveat: true,
-			            premultipliedAlpha: true,
-			            preserveDrawingBuffer: true
+			            alpha: true
 			        });
 			        
 			        this.canvas = canvas;
@@ -362,7 +356,7 @@ void main() {
 					this.verX = 0;
 					this.verY = 0;
 					this.verZ = 0;
-					this.MaxDrawDistance = 16;
+					this.MaxDrawDistance = 12;
 					this.camera = {
 						position: {x: 0, z: 5, y: 2},
 						rotation: {x: 0, y: 0},
@@ -514,7 +508,7 @@ void main() {
 				}
 				step() {
 					this.timeTick++;
-					this.verY -= 0.0125;
+					this.verY -= 0.01;
 					if (this.moveZ == 1) {
 						this.verZ += -(this.playerSpeed * this.camera.distance.cosX);
 						this.verX += this.playerSpeed * this.camera.distance.sinX;
@@ -531,12 +525,12 @@ void main() {
 						this.verX += (this.playerSpeed * this.camera.distance.cosX);
 						this.verZ += (this.playerSpeed * this.camera.distance.sinX);
 					}
-					this.verX = (this.verX * 0.85);
+					this.verX = (this.verX * 0.8);
 					this.player.x += this.verX;
 					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined)
 						this.player.x -= this.verX,
 						this.verX = 0;
-					this.verZ = (this.verZ * 0.85);
+					this.verZ = (this.verZ * 0.8);
 					this.player.z += this.verZ;
 					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined)
 						this.player.z -= this.verZ,
@@ -548,7 +542,7 @@ void main() {
 					this.player.y -= 0.1;
 					if (this.getTerrain(this.player.x, this.player.y, this.player.z) !== undefined) 
 						if (this.moveY == 1) 
-							this.verY = 0.25;
+							this.verY = 0.22;
 					this.player.y += 0.1;
 					this.camera.position.x = this.player.x;
 					this.camera.position.y = this.player.y + this.player.height;
@@ -623,10 +617,18 @@ void main() {
 			gameArea.appendChild(game.canvas);
 
 			var fps0 = document.getElementById('fps0');
+			var fps1 = document.getElementById('fps1');
+			var fps2 = document.getElementById('fps2');
+
+			fps1.addEventListener("input", function(e) {
+				game.MaxDrawDistance = +fps1.value;
+				fps2.textContent = fps1.value;
+			});
 
 			function resize() {
 				game.camera.FOV = window.innerHeight / 2;
 				game.setWH(window.innerWidth, window.innerHeight);
+				game.render();
 			}
 
 			gameArea.addEventListener("mousemove", function(e) {

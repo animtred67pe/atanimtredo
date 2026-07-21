@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>Agar.io - Anim Tred Games</title>
+		<title>Agar.io - EAAQ HTMLs</title>
 		<style>
 			body{
 			    margin: 0;
@@ -41,19 +41,22 @@
 			    HighScores = 0;
 			    var Level_Size_Collision = true;
 			    var Collects_Max = 2500;
-			    var VirusR_Max = 50;
+			    var VirusR_Max = 100;
 			    var TimerH = 0;
 			    var KeyPressH = null;
 			    var splitKey = 0;
-			    var Level_Size = 10000;
+			    var Level_Size = 100000;
 			    var MyPlayerX = 0;
 			    var MyPlayerY = 0;
 			    var MyPlayerUsername = "Username";
 			    var Mouse_X_Position = 0;
 			    var Mouse_Y_Position = 0;
+
 			    var Camera_X_Position = mathRandomInt(0, Level_Size);
 			    var Camera_Y_Position = mathRandomInt(0, Level_Size);
 			    var Camera_Zoom = 1;
+			    var Camera_ZoomOriginal = 1;
+			    var CZoom = 0;
 			    timeSecX = 0;
 			    var me_list = null;
 			    RespawnPlayer()
@@ -91,6 +94,7 @@
 			            }
 			            Me_Move(((Mouse_X_Position / 0.3) + Camera_X_Position),((Mouse_Y_Position / 0.3) + Camera_Y_Position));
 			            Set_Zoom();
+			            Camera_Zoom = Camera_ZoomOriginal + CZoom;
 			            Camera_X_Position = MyPlayerX;
 			            Camera_Y_Position = MyPlayerY;	
 			        }
@@ -106,7 +110,7 @@
 			        if (!(me_list.length > 0)) {
 			            Camera_X_Position += Mouse_X_Position / 17;
 			            Camera_Y_Position += Mouse_Y_Position / 17;
-			            Camera_Zoom += ((3.6 - Camera_Zoom) / 5);
+			            Camera_ZoomOriginal += ((3.6 - Camera_ZoomOriginal) / 5);
 			        }
 
 			        document.getElementById('demo').innerHTML = "Score: " + Scores + " High: " + HighScores;
@@ -225,7 +229,7 @@
 			        }
 			        xp = ((xp + dx) / 2);
 			        yp = ((yp + dy) / 2);
-			        Camera_Zoom += ((((siz / 500) + 0.8) - Camera_Zoom) / 7);
+			        Camera_ZoomOriginal += ((((siz / 500) + 0.8) - Camera_ZoomOriginal) / 7);
 			        MyPlayerX = xp;
 			        MyPlayerY = yp;
 			    }
@@ -515,24 +519,38 @@
 			    }
 			    document.addEventListener('keydown',function(evento){
 			    	if (evento.keyCode == 32){
-				        posFixedKeySpace();
-				    } else if (evento.keyCode == 87){
+			        	KeyPressH = "Space";
+				    }
+				    if (evento.keyCode == 87){
 				        KeyPressH = "w";
-				    } else if (evento.keyCode == 71){
+				    }
+				    if (evento.keyCode == 71){
+				        for (var i = 0; i < me_list.length; i += 7) {
+				        	me_list[i] += 50;
+				        }
+				    }
+				    if (evento.keyCode == 81){
+				    	CZoom -= 1;
+				    	if (CZoom < 0)
+				    		CZoom = 0;
+				    }
+				    if (evento.keyCode == 69){
+				    	CZoom += 1;
+				    }
+				    if (evento.keyCode == 65){
+				        for (var i = 0; i < me_list.length; i += 7) {
+				        	me_list[i] += 50;
+				        }
+				    }
+				    if (evento.keyCode == 68){
 				        for (var i = 0; i < me_list.length; i += 7) {
 				        	me_list[i] += 50;
 				        }
 				    }
 				});
 			    document.addEventListener('keyup',function(evento){
-			        clearFixedKeyPressH();
-			    });
-			    function posFixedKeySpace(){
-			        KeyPressH = "Space";
-			    }
-			    function clearFixedKeyPressH() {
 			        KeyPressH = null;
-			    }
+			    });
 			    return {
 			        cnvs_getCoordinates,
 			        RespawnPlayer,
