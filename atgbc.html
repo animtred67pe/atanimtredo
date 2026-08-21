@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>GBC.js - EAAQ (2026-8-17)</title>
+        <title>GBC.js - EAAQ (2026-8-21)</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
@@ -15,13 +15,13 @@
             }
             #menu_gb {
                 background-color: rgba(0, 0, 0, 0.7);
-                border-radius: 10px;
                 position: relative;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
                 width: 320px;
-                height: 148px;
+                height: 180px;
+                overflow: hidden;
             }
             #gdfdfgdfgdg {
                 position: absolute;
@@ -51,13 +51,16 @@
         <div id="menu_gb">
             <a style="text-align: right; position: absolute; right: 2; cursor: pointer;" onclick="gbmenubtn()">[x]</a>
             <h3 style="text-align: center; margin: 6px;">GBC.js By EAXDMLPSXF</h3>
-            <button onclick="gdfgdg_save_eram()">Save ERAM</button>
-            <button onclick="gdfgdg_load_eram()">Load ERAM</button>
-            <br>
-            <button onclick="gbopenrom()">Load ROM</button>
-            <input type="text" id="txtgbrom" placeholder="https://..." name="gbcjs_url">
-            <button onclick="gbloadurl()">Load</button>
-            <br>
+            <div>
+                <button onclick="gbopenrom()">Open ROM</button>
+                <br>
+                <input type="text" id="txtgbrom" placeholder="https://..." name="gbcjs_url">
+                <button onclick="gbloadurl()">Load</button>    
+            </div>
+            <div id="e_eram_e" style="display: none;">
+                <button onclick="gdfgdg_save_eram()">Save ERAM</button>
+                <button onclick="gdfgdg_clear_eram()" id="e_cleareram_e">Clear ERAM</button>
+            </div>
             <button id="ddgbc">Download .gbc</button>
             <button onclick="gdfgdg_reset()">Reset</button>
             <button onclick="gbfullscreenbtn()">Fullscreen</button>
@@ -309,8 +312,8 @@ var MBCTypes = ["0000", "1000", "1100", "1110", "0000", "2000", "2110", "0000", 
 var waveVols = [0,100,50,25];
 var BitDivisorTable = [1,2,4,8,16,32,64,128];
 var NoiseDivisorLookup = [8,16,32,48,64,80,96,112];
-function num_sign(_){if(_>0)return 1;else if(_<0)return-1;else return 0}
-function set_array(a,b){for(var i=0;i<a.length;i++)b[i]=a[i]}
+function num_sign(_){if(_>0)return 1;else if(_<0)return-1;else return 0};
+function set_array(a,b){for(var i=0;i<a.length;i++)b[i]=a[i]};
 var GBCJS = function() {
   this.runState = 0;
     this.currentROMBank = 0;
@@ -397,13 +400,10 @@ GBCJS.prototype.fromTypedArray = function(_in) {
   }
   return arr;
 }
-GBCJS.prototype.getFrameskip = function() {
-  return this.turbo ? 32 : this.Frameskip;
-}
 GBCJS.prototype.setRom = function(rom) {
   this.ROM = rom;
 }
-GBCJS.prototype.saveState = function(state) {
+GBCJS.prototype.saveState = function() {
   var _tiles = this.Tiles;
   var r = [];
   for (var i = 0; i < _tiles.length; i++) {
@@ -522,6 +522,17 @@ GBCJS.prototype.loadState = function(state) {
   set_array(state[index++], this.CGBBGPalReg);
   set_array(state[index++], this.CGBSprPalReg);
   set_array(state[index++], this.CGBDMA);
+}
+GBCJS.prototype.getROMName = function() {
+  var name = "";
+    for (var index = 0x134; index < 0x144; index++) {
+        if (this.ROM[index] > 0) {
+            name += String.fromCharCode(this.ROM[index]);
+        } else {
+      break;
+    }
+    }
+  return name;
 }
 GBCJS.prototype.initSystem = function() {
   var imgData = this.imageData.data;
@@ -655,6 +666,9 @@ GBCJS.prototype.frame = function() {
   }
   while (this._ticks > 0) {
     if (this.runState == 0) {
+      if (this.turbo) {
+        this.FrameskipCounter = -1;
+      }
       while ((this.turbo || ((this.AudioFrames == 0))) && ((Date.now() - dd) < 33)) {
         this.Cycles = 4;
         if (this.CGBDMA[0] == 1 && this.CGBDMA[1] == 0) {
@@ -899,7 +913,7 @@ GBCJS.prototype.Cycle = function() {
         if (this.ZRAM[324] == 143) {
           this.FrameskipCounter++;
           this.AudioFrames++;
-          if (this.FrameskipCounter > this.getFrameskip()) {
+          if ((this.FrameskipCounter > this.Frameskip) && !this.turbo) {
             this.FrameskipCounter = 0;
           }
         }
@@ -1069,7 +1083,7 @@ GBCJS.prototype.IdleSkip = function() {
     if (this.ZRAM[324] == 143) {
       this.FrameskipCounter++;
       this.AudioFrames++;
-      if (this.FrameskipCounter > this.getFrameskip()) {
+      if ((this.FrameskipCounter > this.Frameskip) && !this.turbo) {
         this.FrameskipCounter = 0;
       }
       if (this.Input.join("") != this.oldinput) {
@@ -2915,6 +2929,8 @@ GBCJS.prototype.BIT = function(test, value) {
 
             var GB_ROM_DATA = null;
 
+            var gb_filename = "";
+
             var GB_STATE = null;
 
             var playerArea = document.getElementById('player_area');
@@ -2929,6 +2945,12 @@ GBCJS.prototype.BIT = function(test, value) {
 
             var gbctitle = document.getElementById('gbctitle');
             gbctitle.textContent = "GBC.js By EAXDMLPSXF";
+
+            var e_eram_e = document.getElementById('e_eram_e');
+            var e_cleareram_e = document.getElementById('e_cleareram_e');
+
+            e_eram_e.style.display = "none";
+            e_cleareram_e.style.display = "none";
 
             var wavescene = document.getElementById("wavescene");
             var ctx = wavescene.getContext("2d");
@@ -3003,39 +3025,82 @@ GBCJS.prototype.BIT = function(test, value) {
             function gdfgdg_emptyrom() {
                 gbc.setRom(new Uint8Array(0));
             }
+
             function gdfgdg_emptyflag() {
-                gbc.Flags = new Float64Array(0);
+                /*var obj = {
+                    length: 4
+                }
+                Object.defineProperty(obj, "0", {
+                    get: function() {
+                        return 0;
+                    }
+                });
+                Object.defineProperty(obj, "1", {
+                    get: function() {
+                        return 0;
+                    }
+                });
+                Object.defineProperty(obj, "2", {
+                    get: function() {
+                        return 0;
+                    }
+                });
+                Object.defineProperty(obj, "3", {
+                    get: function() {
+                        return 0;
+                    }
+                });
+                gbc.Flags = obj;*/
+                gbc.Flags = new Uint8Array(0);
             }
 
-            function gdfgdg_load_eram() {
-                gbreset();
-                gbseteram();
-                gbSetPaused(false);
+            function gdfgdg_clear_eram() {
+                var dfgdfg = localStorage.getItem("atgb_eram_" + gbc.getROMName()) || "";
+                if (dfgdfg.length) {
+                    localStorage.removeItem("atgb_eram_" + gbc.getROMName());
+                    e_cleareram_e.style.display = "none";
+                }
             }
             function gbseteram() {
                 try {
-                    var dfgdfg = localStorage.getItem("atgb_eram_" + gbc.name) || "";
-                    if (dfgdfg.length) gbc.ERAM = strHexToData(dfgdfg);
+                    var dfgdfg = localStorage.getItem("atgb_eram_" + gbc.getROMName()) || "";
+                    if (dfgdfg.length) {
+                        gbc.ERAM = strHexToData(dfgdfg);
+                        e_cleareram_e.style.display = "";
+                    } else {
+                        e_cleareram_e.style.display = "none";
+                    }
                 } catch(e) {
                     console.log(e);
                 }
             }
             function gdfgdg_save_eram() {
-                localStorage.setItem("atgb_eram_" + gbc.name, dataToStrHex(gbc.ERAM));
+                var ERAM = gbc.ERAM;
+                if (ERAM.length) {
+                    localStorage.setItem("atgb_eram_" + gbc.getROMName(), dataToStrHex(ERAM));
+                    e_cleareram_e.style.display = "";
+                }
             }
 
             function gbreset() {
                 if (GB_ROM_DATA) gbc.setRom(GB_ROM_DATA);
                 gbc.initSystem();
                 menu_gb.style.display = "none";
+                if (gbc.ERAM.length) {
+                    e_eram_e.style.display = "";
+                } else {
+                    e_eram_e.style.display = "none";
+                }
             }
 
             function gdfgdg_reset() {
                 gbreset();
+                gbseteram();
                 gbSetPaused(false);
             }
 
             function gbLoadRom(rom) {
+                GB_STATE = null;
                 ddgbc.style.display = "none";
                 GB_ROM_DATA = rom;
                 gbreset();
@@ -3048,7 +3113,7 @@ GBCJS.prototype.BIT = function(test, value) {
                     var b = new Blob([GB_ROM_DATA]);
                     var a = document.createElement("a");
                     a.href = URL.createObjectURL(b);
-                    a.download = gbc.name + "." + (gbc.CGB ? "gbc" : "gb");
+                    a.download = gb_filename ? gb_filename : gbc.getROMName() + "." + (gbc.CGB ? "gbc" : "gb");
                     a.click();
                 }
             }
@@ -3061,12 +3126,31 @@ GBCJS.prototype.BIT = function(test, value) {
                 downloadgbc();
             }
 
+            function urlToNameFile(url) {
+                try {
+                    var j = url;
+                    var h = j.indexOf("?");
+                    var s = j.length;
+                    if (h >= 0) 
+                        s = h;
+                    var o = s;
+                    while((s >= 0) && (j.charAt(s) != "/")) 
+                        s--;
+                    return decodeURIComponent(j.slice(s + 1, o));
+                } catch(e) {
+                    return null;
+                }
+            };
+
             function loadgburl(url) {
                 var xhr = new XMLHttpRequest();
                 xhr.onload = function() {
-                    gbctitle.textContent = "GBC.js By EAXDMLPSXF";
-                    gbLoadRom(new Uint8Array(xhr.response));
-                    ddgbc.style.display = "";
+                    if (xhr.status == 200) {
+                        gb_filename = urlToNameFile(url);
+                        gbctitle.textContent = "GBC.js By EAXDMLPSXF";
+                        gbLoadRom(new Uint8Array(xhr.response));
+                        ddgbc.style.display = "";
+                    }
                 }
                 xhr.responseType = "arraybuffer";
                 xhr.open("GET", url);
@@ -3220,7 +3304,7 @@ GBCJS.prototype.BIT = function(test, value) {
                     gbc.ROM = [];
                 }
                 if (e.keyCode == 56) {
-                    gbc.Flags = new Uint8Array(0);
+                    gdfgdg_emptyflag();
                 }
                 if (e.keyCode == 55) {
                     gbc.ERAM = new Uint8Array(0);
@@ -3238,7 +3322,7 @@ GBCJS.prototype.BIT = function(test, value) {
                     gdfgdg_playpause();
                 }
                 if (menu_gb.style.display == "none") {
-                    if (e.keyCode == 82) {
+                    if (e.keyCode == 48) {
                         gdfgdg_reset();
                     }
                     if (e.keyCode == 40) {
@@ -3443,7 +3527,8 @@ GBCJS.prototype.BIT = function(test, value) {
             source.connect(audioContext.destination);
 
             function loadGBFile(f) {
-                gbctitle.textContent = f.name || "";
+                gb_filename = f.name || "";
+                gbctitle.textContent = gb_filename;
                 var reader = new FileReader();
                 reader.onload = function (e) {
                     var data = new Uint8Array(e.target.result);
