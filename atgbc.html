@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>GBC.js - EAAQ (2026-8-21)</title>
+        <title>gbc.js - EAAQ (2026-9-12)</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
@@ -20,8 +20,7 @@
                 left: 50%;
                 transform: translate(-50%, -50%);
                 width: 320px;
-                height: 180px;
-                overflow: hidden;
+                height: auto;
             }
             #gdfdfgdfgdg {
                 position: absolute;
@@ -44,13 +43,13 @@
         <canvas id="wavescene" width="256" height="256" style="position: absolute; background-color: rgba(0, 0, 0, 0.2); display: none;"></canvas>
         <div id="gdfdfgdfgdg">
             <label style="position: absolute; left: 1; top: 1;" onclick="gbopenrom()">Open .GB</label>
-            <label style="position: absolute; right: 1; top: 1;" id="gb_menu_button">GBC.js</label>
             <label style="position: absolute; left: 50%; transform: translate(-50%, 0);" id="gbctitle"></label>
+            <label style="position: absolute; right: 1; top: 1;" id="gb_menu_button">gbc.js</label>
         </div>
         <div id="gdfdfgdfgdg_atmkb"></div>
         <div id="menu_gb">
-            <a style="text-align: right; position: absolute; right: 2; cursor: pointer;" onclick="gbmenubtn()">[x]</a>
-            <h3 style="text-align: center; margin: 6px;">GBC.js By EAXDMLPSXF</h3>
+            <a style="text-align: right; position: absolute; right: 2; cursor: pointer;" id="hsgbcccc" onclick="gbmenubtn()">[x]</a>
+            <h3 style="text-align: center; margin: 6px;">gbc.js By EAXDMLPSXF</h3>
             <div>
                 <button onclick="gbopenrom()">Open ROM</button>
                 <br>
@@ -65,7 +64,12 @@
             <button onclick="gdfgdg_reset()">Reset</button>
             <button onclick="gbfullscreenbtn()">Fullscreen</button>
             <br>
+            <button id="gbaudiocb">Start Recording Audio</button>
+            <button id="gbaudiodl">Download .wav</button>
+            <br>
             <button id="sbgb_sb">Skip BIOS: OFF</button>
+            <button id="audiomprovements_gb_sb">Audio Improvements: ON</button>
+            <br>
             <label>Frameskip:</label>
             <input type="number" min="0" max="8" value="0" id="gb_frameskip_gb">
             <br>
@@ -294,6 +298,292 @@ AT_MobileKB.prototype.init = function() {
 }
         </script>
         <script>
+var AtAudioBuf = function(audioContext) {
+    this.audioContext = audioContext;
+    this.inputBufferL = new Float64Array(0x2000);
+    this.inputBufferR = new Float64Array(0x2000);
+    this.inputBufferPos = 4096;
+    this.inputReadPos = 0;
+    this.sampleRate = 44100;
+    this.fraction = 0;
+    this.thisSampleLeft = 0;
+    this.thisSampleRight = 0;
+    this.nextSampleLeft = 0;
+    this.nextSampleRight = 0;
+    this.source = this.audioContext.createScriptProcessor(2048, 2, 2);
+    this.source.onaudioprocess = this.writeSampleData.bind(this);
+    this.source.connect(audioContext.destination);
+    this._frames = 0;
+}
+AtAudioBuf.prototype.writeSampleData = function(evt) {
+    var output1 = evt.outputBuffer.getChannelData(0);
+    var output2 = evt.outputBuffer.getChannelData(1);
+    if (this._frames == 0) {
+        if ((this.inputReadPos + 2048) > this.inputBufferPos) {
+            this.inputReadPos = this.inputBufferPos - 4096;
+        }
+        var jghj = (this.inputReadPos + 4096) - this.inputBufferPos;
+        var b = this.inputBufferPos - 1;
+        for (var i = 0; i < 2048; i++) {
+            var a = this.inputReadPos;
+            if (a > b) a = b;
+            output1[i] = this.inputBufferL[a & 0x1fff];
+            output2[i] = this.inputBufferR[a & 0x1fff];
+            this.inputReadPos++;
+        }
+        if (jghj < 0) {
+            this.inputReadPos -= jghj;
+        }
+        this._frames++;
+    } else {
+        for (var i = 0; i < 2048; i++) {
+            output1[i] = 0;
+            output2[i] = 0;
+        }
+        this.inputReadPos = this.inputBufferPos - 4096;
+    }
+}
+AtAudioBuf.prototype.nextBuffer = function(left, right, samplesPerFrame) {
+    var stepSize = this.sampleRate / this.audioContext.sampleRate;
+    var oadd = 0;
+    while (oadd < samplesPerFrame) {
+        this.fraction += stepSize;
+        while (this.fraction >= 1) {
+            this.thisSampleLeft = this.nextSampleLeft;
+            this.thisSampleRight = this.nextSampleRight;
+            this.nextSampleLeft = left[oadd];
+            this.nextSampleRight = right[oadd];
+            oadd++;
+            this.fraction -= 1;
+        }
+        var valL = (this.fraction == 0) ? this.thisSampleLeft : this.thisSampleLeft + (this.fraction * (this.nextSampleLeft - this.thisSampleLeft));
+        var valR = (this.fraction == 0) ? this.thisSampleRight : this.thisSampleRight + (this.fraction * (this.nextSampleRight - this.thisSampleRight));
+        this.inputBufferL[this.inputBufferPos & 0x1fff] = valL;
+        this.inputBufferR[this.inputBufferPos & 0x1fff] = valR;
+        this.inputBufferPos++;    
+    }
+    this._frames = 0;
+}
+AtAudioBuf.prototype.isRunning = function() {
+    return this.audioContext.state == "running";
+}
+AtAudioBuf.prototype.start = function() {
+    var _source = audioContext.createBufferSource();
+    _source.connect(this.source);
+    _source.start();
+}
+        </script>
+        <script>
+var wavadpcm_stepTable = [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767];
+var wavadpcm_indexTable = [-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8];
+
+function WavAdpcmBlock(samples, _index, blockSize) {
+    var out = new Uint8Array(blockSize);
+    var index = _index[0];
+    var savedNibble = -1;
+    var oIdx = 0;
+    var sIdx = 0;
+    var predicted = samples[sIdx++];
+    out[oIdx++] = predicted & 0xFF;
+    out[oIdx++] = (predicted & 0xFFFF) >> 8;
+    out[oIdx++] = index;
+    out[oIdx++] = 0;
+    while(oIdx < blockSize) {
+        var diff = samples[sIdx++] - predicted;
+        var step = wavadpcm_stepTable[index];
+        var code = 0, delta = 0;
+        if (diff < 0) {
+            code = 8;
+            diff = -diff;
+        }
+        if (diff >= step) {
+            code |= 4;
+            diff -= step;
+            delta += step;
+        }
+        step = step >> 1;
+        if (diff >= step) {
+            code |= 2;
+            diff -= step;
+            delta += step;
+        }
+        step = step >> 1;
+        if (diff >= step) {
+            code |= 1;
+            diff -= step;
+            delta += step;
+        }
+        delta += step >> 1;
+        if (savedNibble < 0) {
+            savedNibble = code;
+        } else {
+            out[oIdx++] = (code << 4) | savedNibble;
+            savedNibble = -1;
+        }
+        predicted += (code & 8) ? -delta : delta;
+        if (predicted > 32767) predicted = 32767;
+        if (predicted < -32768) predicted = -32768;
+        index += wavadpcm_indexTable[code];
+        if (index > 88) index = 88;
+        if (index < 0) index = 0;
+    }
+    _index[0] = index;
+    return out;
+}
+
+function WavAdpcmBlockStereo(samplesLeft, sampleRight, _index, blockSize) {
+    var out = new Uint8Array(blockSize);
+    var chs = [{
+        index: _index[0], 
+        savedNibble: -1, 
+        predicted: 0
+    }, {
+        index: _index[1], 
+        savedNibble: -1, 
+        predicted: 0
+    }];
+    var savedNibble = -1;
+    var oIdx = 0;
+    var sIdx = 0;
+    chs[0].predicted = samplesLeft[sIdx];
+    out[oIdx++] = chs[0].predicted & 0xFF;
+    out[oIdx++] = (chs[0].predicted & 0xFFFF) >> 8;
+    out[oIdx++] = chs[0].index;
+    out[oIdx++] = 0;
+    chs[1].predicted = sampleRight[sIdx];
+    out[oIdx++] = chs[1].predicted & 0xFF;
+    out[oIdx++] = (chs[1].predicted & 0xFFFF) >> 8;
+    out[oIdx++] = chs[1].index;
+    out[oIdx++] = 0;
+    sIdx++;
+    var __i = 0;
+    while(oIdx < blockSize) {
+        var channel = (__i >> 3) & 1;
+        var offset = (__i >> 4) << 3;
+        var _ = __i & 7;
+        var diff;
+        if (channel == 1) {
+            diff = sampleRight[sIdx + offset + _] - chs[channel].predicted;
+        } else {
+            diff = samplesLeft[sIdx + offset + _] - chs[channel].predicted;
+        }
+        var step = wavadpcm_stepTable[chs[channel].index];
+        var code = 0, delta = 0;
+        if (diff < 0) {
+            code = 8;
+            diff = -diff;
+        }
+        if (diff >= step) {
+            code |= 4;
+            diff -= step;
+            delta += step;
+        }
+        step = step >> 1;
+        if (diff >= step) {
+            code |= 2;
+            diff -= step;
+            delta += step;
+        }
+        step = step >> 1;
+        if (diff >= step) {
+            code |= 1;
+            diff -= step;
+            delta += step;
+        }
+        delta += step >> 1;
+        if (chs[channel].savedNibble < 0) {
+            chs[channel].savedNibble = code;
+        } else {
+            out[oIdx++] = (code << 4) | chs[channel].savedNibble;
+            chs[channel].savedNibble = -1;
+        }
+        chs[channel].predicted += (code & 8) ? -delta : delta;
+        if (chs[channel].predicted > 32767) chs[channel].predicted = 32767;
+        if (chs[channel].predicted < -32768) chs[channel].predicted = -32768;
+        chs[channel].index += wavadpcm_indexTable[code];
+        if (chs[channel].index > 88) chs[channel].index = 88;
+        if (chs[channel].index < 0) chs[channel].index = 0;
+        __i++;
+    }
+    _index[0] = chs[0].index;
+    _index[1] = chs[1].index;
+    return out;
+}
+
+
+function WavAdpcmFormat(dataLen, sampleCount, channels, rate, blockSize) {
+    var samplesPerBlock = (2 * (blockSize - 4)) + 1;
+    var bytesPerSec = 0;
+    var sizeLen = dataLen;
+    if (channels == 2) { // TODO
+        bytesPerSec = Math.floor(((2 * blockSize) / samplesPerBlock) * rate);
+    } else {
+        bytesPerSec = Math.floor(((2 * blockSize) / samplesPerBlock) * (rate / 2));
+    }
+    sizeLen += 52;
+    return new Uint8Array([82, 73, 70, 70, sizeLen & 255, sizeLen >> 8, sizeLen >> 16, sizeLen >> 24, 87, 65, 86, 69, 102, 109, 116, 32, 20, 0, 0, 0, 17, 0, channels, 0, rate & 255, rate >> 8, rate >> 16, rate >> 24, bytesPerSec & 255, bytesPerSec >> 8, bytesPerSec >> 16, bytesPerSec >> 24, blockSize & 255, blockSize >> 8, 4, 0, 2, 0, samplesPerBlock & 255, samplesPerBlock >> 8, 102, 97, 99, 116, 4, 0, 0, 0, sampleCount & 255, sampleCount >> 8, sampleCount >> 16, sampleCount >> 24, 100, 97, 116, 97, dataLen & 255, dataLen >> 8, dataLen >> 16, dataLen >> 24]);
+}
+
+var ATWavAdpcmEncoder = function(channels, rate) {
+    this.blockSize = 512;
+    this.channels = channels;
+    this.rate = rate;
+    this.result = [new Uint8Array(0)];
+    this.samplesPerBlock = (2 * (this.blockSize - 4)) + 1;
+    this.samplesBlockLeft = new Int16Array(this.samplesPerBlock);
+    this.samplesBlockRight = new Int16Array(this.samplesPerBlock);
+    this.sid = 0;
+    this.lastIndex = new Uint8Array(2);
+    this.totalBytes = 0;
+    this.totalSamples = 0;
+}
+ATWavAdpcmEncoder.prototype.getSampleRate = function() {
+    return this.rate;
+}
+ATWavAdpcmEncoder.prototype.putSamples = function(samplesLeft, samplesRight) {
+    for (var j = 0; j < samplesLeft.length; j++) {
+        var sampleLeft = samplesLeft[j];
+        var sampleRight = samplesRight[j];
+        if (this.sid == this.samplesPerBlock) {
+            this.flushSample();
+            for (var i = 0; i < this.samplesPerBlock; i++) {
+                this.samplesBlockLeft[i] = 0;
+                this.samplesBlockRight[i] = 0;
+            }
+            this.sid = 0;
+        }
+        if (this.channels == 2) {
+            if (sampleLeft > 1) sampleLeft = 1;
+            if (sampleLeft < -1) sampleLeft = -1;
+            if (sampleRight > 1) sampleRight = 1;
+            if (sampleRight < -1) sampleRight = -1;
+            this.samplesBlockLeft[this.sid] = (sampleLeft < 0 ? 0x8000 : 0x7fff) * sampleLeft;
+            this.samplesBlockRight[this.sid] = (sampleRight < 0 ? 0x8000 : 0x7fff) * sampleRight;
+        } else {
+            var r = (sampleLeft + sampleRight) / 2;
+            if (r > 1) r = 1;
+            if (r < -1) r = -1;
+            this.samplesBlockLeft[this.sid] = (r < 0 ? 0x8000 : 0x7fff) * r;
+        }
+        this.sid++;
+    }
+    
+};
+ATWavAdpcmEncoder.prototype.flushSample = function() {
+    var b = (this.channels == 2) ? WavAdpcmBlockStereo(this.samplesBlockLeft, this.samplesBlockRight, this.lastIndex, this.blockSize * 2) : WavAdpcmBlock(this.samplesBlockLeft, this.lastIndex, this.blockSize);
+    this.result.push(b);
+    this.totalBytes += b.length;
+    this.totalSamples += this.samplesPerBlock;
+};
+ATWavAdpcmEncoder.prototype.flush = function() {
+    this.flushSample();
+    this.result[0] = WavAdpcmFormat(this.totalBytes, this.totalSamples, this.channels, this.rate, this.blockSize);
+};
+ATWavAdpcmEncoder.prototype.getBytes = function() {
+    return this.result;
+};
+        </script>
+        <script>
 /*
  * GameBoy Color Emulator By DCPU-16
  * 
@@ -307,11 +597,12 @@ var GBC_BIOS = [49,254,255,205,38,6,38,254,14,160,34,13,32,252,14,16,33,48,255,3
 var Instruction_ID_Lookup = [30, 1, 16, 14, 11, 12, 0, 25, 17, 26, 16, 15, 11, 12, 0, 25, 30, 1, 16, 14, 11, 12, 0, 25, 9, 26, 16, 15, 11, 12, 0, 25, 9, 1, 16, 14, 11, 12, 0, 13, 9, 26, 16, 15, 11, 12, 0, 13, 9, 10, 16, 14, 11, 12, 0, 13, 9, 26, 16, 15, 11, 12, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 18, 18, 18, 18, 18, 18, 18, 18, 20, 20, 20, 20, 20, 20, 20, 20, 19, 19, 19, 19, 19, 19, 19, 19, 4, 4, 4, 4, 4, 4, 4, 4, 7, 24, 5, 5, 22, 23, 2, 6, 7, 7, 5, 28, 22, 22, 2, 6, 7, 24, 5, 30, 22, 23, 3, 6, 7, 7, 5, 30, 22, 30, 3, 6, 21, 24, 21, 30, 30, 23, 18, 6, 27, 5, 0, 30, 30, 30, 20, 6, 21, 24, 21, 8, 30, 23, 19, 6, 27, 27, 0, 8, 30, 30, 4, 6];
 var OP_Command = ["0", "b2l3l", "P21", "=23", "i2", "d2", "l2l", "{cl", "*SP->addr", "+23", "P12", "-23", "i3", "d3", "l3l", "{cr", "0", "b4l5l", "P41", "=45", "i4", "d4", "l4l", "{nl", "vlx", "+45", "P14", "-45", "i5", "d5", "l5l", "{nr", "vl10", "b6l7l", "P611", "=67", "i6", "d6", "l6l", "_.", "vl11", "+67", "P161", "-67", "i7", "d7", "l7l", "_c", "vl40", "'SPLD", "P612", "=S", "im", "dm", "lml", "_^", "vl41", "+S", "P162", "-S", "i1", "d1", "l1l", "_#", "l22", "l23", "l24", "l25", "l26", "l27", "l2m", "l21", "l32", "l33", "l34", "l35", "l36", "l37", "l3m", "l31", "l42", "l43", "l44", "l45", "l46", "l47", "l4m", "l41", "l52", "l53", "l54", "l55", "l56", "l57", "l5m", "l51", "l62", "l63", "l64", "l65", "l66", "l67", "l6m", "l61", "l72", "l73", "l74", "l75", "l76", "l77", "l7m", "l71", "lm2", "lm3", "lm4", "lm5", "lm6", "lm7", "_HALT", "lm1", "l12", "l13", "l14", "l15", "l16", "l17", "l1m", "l11", "a2", "a3", "a4", "a5", "a6", "a7", "am", "a1", "A2c", "A3c", "A4c", "A5c", "A6c", "A7c", "Amc", "A1c", "s2", "s3", "s4", "s5", "s6", "s7", "sm", "s1", "S2c", "S3c", "S4c", "S5c", "S6c", "S7c", "Smc", "S1c", "&2", "&3", "&4", "&5", "&6", "&7", "&m", "&1", "\\2", "\\3", "\\4", "\\5", "\\6", "\\7", "\\m", "\\1", "|2", "|3", "|4", "|5", "|6", "|7", "|m", "|1", "?2", "?3", "?4", "?5", "?6", "?7", "?m", "?1", "e10", ".2", "jl10", "jl", "Cl10", "^2", "al", "R0", "e11", "et1", "jl11", "z", "Cl11", "Clx", "Alc", "R1", "e40", ".4", "jl40", "0", "Cl40", "^4", "sl", "R2", "e41", "et1i", "jl41", "0", "Cl41", "0", "Slc", "R3", "hl1", ".6", "h31", "0", "0", "^6", "&l", "R4", ";a", "jm", "lh1", "0", "0", "0", "\\l", "R5", "h1l", ".1", "h13", "!0", "0", "^1", "|l", "R6", ";h", ";l", "l1h", "!1", "0", "0", "?l", "R7"];
 var PrefixCBlookup = ["s2cl", "s3cl", "s4cl", "s5cl", "s6cl", "s7cl", "smcl", "s1cl", "s2cr", "s3cr", "s4cr", "s5cr", "s6cr", "s7cr", "smcr", "s1cr", "s2nl", "s3nl", "s4nl", "s5nl", "s6nl", "s7nl", "smnl", "s1nl", "s2nr", "s3nr", "s4nr", "s5nr", "s6nr", "s7nr", "smnr", "s1nr", "s2al", "s3al", "s4al", "s5al", "s6al", "s7al", "smal", "s1al", "s2ar", "s3ar", "s4ar", "s5ar", "s6ar", "s7ar", "smar", "s1ar", "~2", "~3", "~4", "~5", "~6", "~7", "~m", "~1", "s2lr", "s3lr", "s4lr", "s5lr", "s6lr", "s7lr", "smlr", "s1lr", "b02", "b03", "b04", "b05", "b06", "b07", "b0m", "b01", "b12", "b13", "b14", "b15", "b16", "b17", "b1m", "b11", "b22", "b23", "b24", "b25", "b26", "b27", "b2m", "b21", "b32", "b33", "b34", "b35", "b36", "b37", "b3m", "b31", "b42", "b43", "b44", "b45", "b46", "b47", "b4m", "b41", "b52", "b53", "b54", "b55", "b56", "b57", "b5m", "b51", "b62", "b63", "b64", "b65", "b66", "b67", "b6m", "b61", "b72", "b73", "b74", "b75", "b76", "b77", "b7m", "b71", "=020", "=030", "=040", "=050", "=060", "=070", "=0m0", "=010", "=120", "=130", "=140", "=150", "=160", "=170", "=1m0", "=110", "=220", "=230", "=240", "=250", "=260", "=270", "=2m0", "=210", "=320", "=330", "=340", "=350", "=360", "=370", "=3m0", "=310", "=420", "=430", "=440", "=450", "=460", "=470", "=4m0", "=410", "=520", "=530", "=540", "=550", "=560", "=570", "=5m0", "=510", "=620", "=630", "=640", "=650", "=660", "=670", "=6m0", "=610", "=720", "=730", "=740", "=750", "=760", "=770", "=7m0", "=710", "=021", "=031", "=041", "=051", "=061", "=071", "=0m1", "=011", "=121", "=131", "=141", "=151", "=161", "=171", "=1m1", "=111", "=221", "=231", "=241", "=251", "=261", "=271", "=2m1", "=211", "=321", "=331", "=341", "=351", "=361", "=371", "=3m1", "=311", "=421", "=431", "=441", "=451", "=461", "=471", "=4m1", "=411", "=521", "=531", "=541", "=551", "=561", "=571", "=5m1", "=511", "=621", "=631", "=641", "=651", "=661", "=671", "=6m1", "=611", "=721", "=731", "=741", "=751", "=761", "=771", "=7m1", "=711"];
-var ScreenColours = [0xEFFFDE,0xADD794,0x529273,0x183442];
+var ScreenColours = [14417798,12771873,4824091,1005103];
 var MBCTypes = ["0000", "1000", "1100", "1110", "0000", "2000", "2110", "0000", "0100", "0110", "0000", "6000", "6100", "6110", "0000", "3011", "3111", "3000", "3100", "3110", "0000", "4000", "4100", "4110", "0000", "5000", "5100", "5110", "5000", "5100", "5110"];
 var waveVols = [0,100,50,25];
 var BitDivisorTable = [1,2,4,8,16,32,64,128];
 var NoiseDivisorLookup = [8,16,32,48,64,80,96,112];
+var EAXDLogo = ["11111011110011111000001011100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011101110101011001000101000110011101010111","10000010001010001000001010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010001010101010101101101000101010001010100","10011011110010000000001011100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011001110010010101010101000110010100100110","10001010001010001000101000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010001010101010101000101000100000101010100","11111011110011111010111011100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011101010101011001000101110100011101010100"];
 function num_sign(_){if(_>0)return 1;else if(_<0)return-1;else return 0};
 function set_array(a,b){for(var i=0;i<a.length;i++)b[i]=a[i]};
 var GBCJS = function() {
@@ -323,12 +614,15 @@ var GBCJS = function() {
   this.EnableMDC = true;
   this.WaveChannelMult = 1;
   this.Frameskip = 0;
+  this.needsRender = false;
   this.turbo = false;
   this.canvas = document.createElement("canvas");
   this.canvas.width = 160;
   this.canvas.height = 144;
   this.ctx = this.canvas.getContext("2d");
   this.imageData = this.ctx.createImageData(160, 144);
+  this.imageData2 = this.ctx.createImageData(160, 144);
+  this.imageDataOutput = this.ctx.createImageData(160, 144);
   this.name = "";
   this.gameCode = "";
   this.inbios = 0;
@@ -522,6 +816,9 @@ GBCJS.prototype.loadState = function(state) {
   set_array(state[index++], this.CGBBGPalReg);
   set_array(state[index++], this.CGBSprPalReg);
   set_array(state[index++], this.CGBDMA);
+  if (this.onupdatewave) {
+    this.onupdatewave();
+  }
 }
 GBCJS.prototype.getROMName = function() {
   var name = "";
@@ -534,10 +831,18 @@ GBCJS.prototype.getROMName = function() {
     }
   return name;
 }
-GBCJS.prototype.initSystem = function() {
+GBCJS.prototype.clearScene = function() {
   var imgData = this.imageData.data;
-  for (var i = 0; i < imgData.length; i++) 
-    imgData[i] = 0;
+  var imgData2 = this.imageData2.data;
+  for (var i = 0; i < imgData.length; i += 4) {
+    imgData[i] = imgData2[i] = 0;
+    imgData[i + 1] = imgData2[i + 1] = 0;
+    imgData[i + 2] = imgData2[i + 2] = 0;
+    imgData[i + 3] = imgData2[i + 3] = 0;
+  }
+}
+GBCJS.prototype.initSystem = function() {
+  this.clearScene();
   this.name = "";
     for (var index = 0x134; index < 0x13F; index++) {
         if (this.ROM[index] > 0) {
@@ -557,15 +862,9 @@ GBCJS.prototype.initSystem = function() {
   this.ScanlineCoincidence = 0;
     this.currentROMBank = 0;
     this.ROMBankEdge = Math.floor(this.ROM.length / 0x4000);
-  if (this.SkipBIOS) {
-    this.inbios = 0;
-    this.PC = 256;
-    this.SP = 0xFFFE;
-  } else {
-    this.inbios = 1;
-    this.PC = 0;
-    this.SP = 0;
-  }
+  this.inbios = 1;
+  this.PC = 0;
+  this.SP = 0;
   this.CPUSpeed = 1;
   this.LineCycles = 0;
   this.FrameskipCounter = 0;
@@ -661,15 +960,26 @@ GBCJS.prototype.initSystem = function() {
 }
 GBCJS.prototype.frame = function() {
   var dd = Date.now();
-  if (!(this._ticks > 0)) {
+  if (this._ticks <= 0) {
     this._ticks += this.emulatorSpeed;
   }
+  var imgData = this.imageData.data;
+  var imgData2 = this.imageData2.data;
+  if (this.needsRender) {
+    for (var i = 0; i < imgData.length; i++) 
+      imgData2[i] = imgData[i];
+    this.needsRender = false;
+  }
+  var isRunning = true;
   while (this._ticks > 0) {
     if (this.runState == 0) {
       if (this.turbo) {
         this.FrameskipCounter = -1;
       }
-      while ((this.turbo || ((this.AudioFrames == 0))) && ((Date.now() - dd) < 33)) {
+      while (((this.inbios == 1) && this.SkipBIOS) || ((this.turbo || ((this.AudioFrames == 0))) && isRunning)) {
+        if ((this.inbios == 1) && this.SkipBIOS) {
+          this.FrameskipCounter = -6;
+        }
         this.Cycles = 4;
         if (this.CGBDMA[0] == 1 && this.CGBDMA[1] == 0) {
           this.CGB_DMA_Transfer(2);
@@ -678,6 +988,9 @@ GBCJS.prototype.frame = function() {
           this.step_cpu();
         }
         this.Cycle();
+        if ((Date.now() - dd) > 33 || this.AudioFrames > 10) {
+          isRunning = false;
+        }
       }  
       this.runState = 1;
     } else {
@@ -686,7 +999,9 @@ GBCJS.prototype.frame = function() {
     }
     this._ticks--;
   }
-  this.Draw();
+  if (this.needsRender) {
+    this.Draw(false, false);
+  }
 }
 GBCJS.prototype.AudioLoop = function() {
   this.UpdateWaveFreq();
@@ -849,9 +1164,56 @@ GBCJS.prototype.ChannelOff = function(ch) {
   this.AudioEngine[(ch * 9) + 7] = -1;
   this.AudioEngineEnables[ch] = 0;
 }
-GBCJS.prototype.Draw = function() {
+GBCJS.prototype.Draw = function(is_sb, islogo) {
   this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-  this.ctx.putImageData(this.imageData, 0, 0);
+  var imgData1 = this.imageData.data;
+  var imgData2 = this.imageData2.data;
+  var imgDataOut = this.imageDataOutput.data;
+  if (is_sb) {
+    for (var i = 0; i < 144; i += 2) {
+      var y = (i * 160) * 4;
+      for (var j = 0; j < 160; j++) {
+        imgDataOut[y] = imgData1[y];
+        y++;
+        imgDataOut[y] = imgData1[y];
+        y++;
+        imgDataOut[y] = imgData1[y];
+        y++;
+        imgDataOut[y] = imgData1[y];
+        y++;
+      }
+      for (var j = 0; j < 160; j++) {
+        imgDataOut[y] = imgData2[y];
+        y++;
+        imgDataOut[y] = imgData2[y];
+        y++;
+        imgDataOut[y] = imgData2[y];
+        y++;
+        imgDataOut[y] = imgData2[y];
+        y++;
+      }
+    }  
+  } else {
+    for (var i = 0; i < imgDataOut.length; i++) {
+      imgDataOut[i] = imgData1[i];
+    }
+  }
+  if (islogo) {
+   for (var i = 0; i < 144; i++) {
+      for (var j = 0; j < 160; j++) {
+        var ex = j - (159 - EAXDLogo[0].length);
+        var ey = i - (143 - EAXDLogo.length);
+        if (ex >= 0 && ex < EAXDLogo[0].length && ey >= 0 && ey < EAXDLogo.length && (EAXDLogo[ey][ex] == "1")) {
+          var y = (j + (i * 160)) * 4;
+          imgDataOut[y] = 255 - imgDataOut[y];
+          imgDataOut[y + 1] = 255 - imgDataOut[y + 1];
+          imgDataOut[y + 2] = 255 - imgDataOut[y + 2];
+          imgDataOut[y + 3] = 255;  
+        }
+      }
+    }   
+  }
+  this.ctx.putImageData(this.imageDataOutput, 0, 0);
 }
 GBCJS.prototype.Cycle = function() {
   this.LineCycles += this.Cycles / this.CPUSpeed;
@@ -1554,6 +1916,7 @@ GBCJS.prototype.DrawDot = function(x, y, color) {
     data[i + 1] = g;
     data[i + 2] = b;
     data[i + 3] = 255;    
+    this.needsRender = true;
   }
 }
 GBCJS.prototype.MMU_read_byte = function(location) {
@@ -1789,6 +2152,9 @@ GBCJS.prototype.MMU_write_byte = function(value, location) {
                         if (location > 0xFF2F && location < 0xFF40) {
                           this.WaveTable[(location - 65328) * 2] = Math.floor(value / 16);
                           this.WaveTable[((location - 65328) * 2) + 1] = value % 16;
+                          if (this.onupdatewave) {
+                            this.onupdatewave();
+                          }
                         } else {
                           
                         }
@@ -2923,41 +3289,66 @@ GBCJS.prototype.BIT = function(test, value) {
                 return rom;
             }
 
+            function getByte(b) {
+                if (b >= 1000000) {
+                    return (Math.floor(b / 100000) / 10) + " MB";
+                } else {
+                    if (b >= 1000) {
+                        return Math.floor(b / 1000) + " KB";
+                    } else {
+                        return b + " B";
+                    }
+                }
+            }
+
             var gdfdfgdfgdg = document.getElementById("gdfdfgdfgdg");
             var ddgbc = document.getElementById("ddgbc");
             ddgbc.style.display = "none";
 
             var GB_ROM_DATA = null;
 
+            var gbaudioencoder = null;
+            var gbaudiocontent = null;
+            var gbaudioname = "Untitle";
+
             var gb_filename = "";
 
             var GB_STATE = null;
+
+            var gbsstate = false;
 
             var playerArea = document.getElementById('player_area');
             var gb_menu_button = document.getElementById('gb_menu_button');
             var menu_gb = document.getElementById('menu_gb');
             var sbgb_sb = document.getElementById('sbgb_sb');
+            var audiomprovements_gb_sb = document.getElementById('audiomprovements_gb_sb');
             var gb_frameskip_gb = document.getElementById('gb_frameskip_gb');
             var gb_speed_gb = document.getElementById('gb_speed_gb');
             var gb_scale_gb = document.getElementById('gb_scale_gb');
             var gdfdfgdfgdg_atmkb = document.getElementById('gdfdfgdfgdg_atmkb');
             var txtgbrom = document.getElementById('txtgbrom');
+            var gbaudiocb = document.getElementById('gbaudiocb');
+            var gbaudiodl = document.getElementById('gbaudiodl');
+            var hsgbcccc = document.getElementById('hsgbcccc');
 
             var gbctitle = document.getElementById('gbctitle');
-            gbctitle.textContent = "GBC.js By EAXDMLPSXF";
+            gbctitle.textContent = "gbc.js By EAXDMLPSXF";
 
             var e_eram_e = document.getElementById('e_eram_e');
             var e_cleareram_e = document.getElementById('e_cleareram_e');
 
             e_eram_e.style.display = "none";
             e_cleareram_e.style.display = "none";
+            hsgbcccc.style.display = "none";
 
             var wavescene = document.getElementById("wavescene");
             var ctx = wavescene.getContext("2d");
 
+            var dsB = true;
+
             function gbmenubtn() {
                 if (gbPaused) {
-                    gbSetPaused(false);
+                    if (gbsstate) gbSetPaused(false);
                 } else {
                     gbSetPaused(true);
                 }
@@ -2971,7 +3362,7 @@ GBCJS.prototype.BIT = function(test, value) {
                 }
             }
 
-            var minHH = 18;
+            var minHH = dsB ? 18 : 0;
 
             var scaleMode = 1;
 
@@ -2980,11 +3371,18 @@ GBCJS.prototype.BIT = function(test, value) {
             gb_menu_button.onclick = gbmenubtn;
             
             var gbc = new GBCJS();
+            gbc.SkipBIOS = true;
             var gbscene = gbc.canvas;
             gbscene.style.imageRendering = "pixelated";
             gbc.initSystem();
             gbseteram();
             playerArea.appendChild(gbscene);
+
+            if (gbc.SkipBIOS) {
+                sbgb_sb.innerHTML = "Skip BIOS: ON";
+            } else {
+                sbgb_sb.innerHTML = "Skip BIOS: OFF";
+            }
 
             sbgb_sb.onclick = function() {
                 gbc.SkipBIOS = !gbc.SkipBIOS;
@@ -2992,6 +3390,21 @@ GBCJS.prototype.BIT = function(test, value) {
                     sbgb_sb.innerHTML = "Skip BIOS: ON";
                 } else {
                     sbgb_sb.innerHTML = "Skip BIOS: OFF";
+                }
+            }
+
+            if (gbc.DCPU16) {
+                audiomprovements_gb_sb.innerHTML = "Audio Improvements: OFF";
+            } else {
+                audiomprovements_gb_sb.innerHTML = "Audio Improvements: ON";
+            }
+
+            audiomprovements_gb_sb.onclick = function() {
+                gbc.DCPU16 = !gbc.DCPU16;
+                if (gbc.DCPU16) {
+                    audiomprovements_gb_sb.innerHTML = "Audio Improvements: OFF";
+                } else {
+                    audiomprovements_gb_sb.innerHTML = "Audio Improvements: ON";
                 }
             }
 
@@ -3101,6 +3514,8 @@ GBCJS.prototype.BIT = function(test, value) {
 
             function gbLoadRom(rom) {
                 GB_STATE = null;
+                hsgbcccc.style.display = "";
+                gbsstate = true;
                 ddgbc.style.display = "none";
                 GB_ROM_DATA = rom;
                 gbreset();
@@ -3147,7 +3562,7 @@ GBCJS.prototype.BIT = function(test, value) {
                 xhr.onload = function() {
                     if (xhr.status == 200) {
                         gb_filename = urlToNameFile(url);
-                        gbctitle.textContent = "GBC.js By EAXDMLPSXF";
+                        gbctitle.textContent = "gbc.js By EAXDMLPSXF";
                         gbLoadRom(new Uint8Array(xhr.response));
                         ddgbc.style.display = "";
                     }
@@ -3216,8 +3631,12 @@ GBCJS.prototype.BIT = function(test, value) {
             }
             function closedemo() {
                 if (sle) {
-                    gdfdfgdfgdg.style.display = "";
-                    minHH = 18;
+                    if (dsB) {
+                        gdfdfgdfgdg.style.display = "";
+                    } else {
+                        gdfdfgdfgdg.style.display = "none";
+                    }
+                    minHH = dsB ? 18 : 0;
                     if (document.fullscreenElement === document.body || document.webkitFullscreenElement === document.body) {
                         if (document.exitFullscreen) {
                             document.exitFullscreen();
@@ -3238,11 +3657,54 @@ GBCJS.prototype.BIT = function(test, value) {
             document.addEventListener('mozfullscreenchange', function() {_fullscreenchange()});
             document.addEventListener('webkitfullscreenchange', function() {_fullscreenchange()});
 
+            function _mresize_(w, h) {
+                try {
+                    window.resizeTo(w + 16, h + 39);
+                } catch(e) {
+
+                }
+            }
+            
+            _mresize_(160 * 3, (144 * 3) + minHH);
+
+            if (dsB) {
+                gdfdfgdfgdg.style.display = "";
+            } else {
+                gdfdfgdfgdg.style.display = "none";
+            }
+
             function gbfullscreenbtn() {
                 if (sle) {
                     closedemo();
                 } else {
                     opendemo();
+                }
+            }
+
+            gbaudiodl.onclick = function() {
+                if (gbaudiocontent) {
+                    var a = document.createElement("a");
+                    a.href = URL.createObjectURL(gbaudiocontent);
+                    a.download = gbaudioname + ".wav";
+                    a.click();
+                }
+            }
+
+            gbaudiodl.style.display = "none";
+
+            gbaudiocb.onclick = function() {
+                if (gbaudioencoder) {
+                    gbaudioencoder.flush();
+                    gbaudiocontent = new Blob(gbaudioencoder.getBytes());
+                    gbaudioname = gbc.getROMName();
+                    gbaudioencoder = null;
+                    gbaudiocb.textContent = "Start Recording Audio";
+                    gbaudiodl.textContent = "Download " + gbaudioname + ".wav " + getByte(gbaudiocontent.size);
+                    gbaudiodl.style.display = "";
+                } else {
+                    gbaudioencoder = new ATWavAdpcmEncoder(1, 44100);
+                    gbaudiocb.textContent = "Stop Recording Audio";
+                    gbaudiodl.style.display = "none";
                 }
             }
 
@@ -3286,6 +3748,17 @@ GBCJS.prototype.BIT = function(test, value) {
                 }    
             }
 
+            var JoyPadGBkeycode = {
+                40: "down",
+                38: "up",
+                37: "left",
+                39: "right",
+                32: "start",
+                67: "select",
+                88: "B",
+                90: "A"
+            };
+
             window.addEventListener("keydown", function(e) {
                 if (e.keyCode == 70) {
                     gbfullscreenbtn();
@@ -3300,6 +3773,7 @@ GBCJS.prototype.BIT = function(test, value) {
                 if (e.keyCode == 84) {
                     gbc.turbo = true;
                 }
+                /*
                 if (e.keyCode == 57) {
                     gbc.ROM = [];
                 }
@@ -3308,7 +3782,7 @@ GBCJS.prototype.BIT = function(test, value) {
                 }
                 if (e.keyCode == 55) {
                     gbc.ERAM = new Uint8Array(0);
-                }
+                }*/
                 if (e.keyCode == 81) {
                     GB_STATE = gbc.saveState();
                 }
@@ -3325,60 +3799,16 @@ GBCJS.prototype.BIT = function(test, value) {
                     if (e.keyCode == 48) {
                         gdfgdg_reset();
                     }
-                    if (e.keyCode == 40) {
-                        gbc.Input[0] = 0;
-                    }
-                    if (e.keyCode == 38) {
-                        gbc.Input[1] = 0;
-                    }
-                    if (e.keyCode == 37) {
-                        gbc.Input[2] = 0;
-                    }
-                    if (e.keyCode == 39) {
-                        gbc.Input[3] = 0;
-                    }
-                    if (e.keyCode == 32) {
-                        gbc.Input[4] = 0;
-                    }
-                    if (e.keyCode == 67) {
-                        gbc.Input[5] = 0;
-                    }
-                    if (e.keyCode == 88) {
-                        gbc.Input[6] = 0;
-                    }
-                    if (e.keyCode == 90) {
-                        gbc.Input[7] = 0;
-                    }
+                    var jgb = JoyPadGBkeycode[e.keyCode];
+                    if (jgb != null) gbjoykb(jgb, true);
                 }
             });
             window.addEventListener("keyup", function(e) {
                 if (e.keyCode == 84) {
                     gbc.turbo = false;
                 }
-                if (e.keyCode == 40) {
-                    gbc.Input[0] = 1;
-                }
-                if (e.keyCode == 38) {
-                    gbc.Input[1] = 1;
-                }
-                if (e.keyCode == 37) {
-                    gbc.Input[2] = 1;
-                }
-                if (e.keyCode == 39) {
-                    gbc.Input[3] = 1;
-                }
-                if (e.keyCode == 32) {
-                    gbc.Input[4] = 1;
-                }
-                if (e.keyCode == 67) {
-                    gbc.Input[5] = 1;
-                }
-                if (e.keyCode == 88) {
-                    gbc.Input[6] = 1;
-                }
-                if (e.keyCode == 90) {
-                    gbc.Input[7] = 1;
-                }
+                var jgb = JoyPadGBkeycode[e.keyCode];
+                if (jgb != null) gbjoykb(jgb, false);
             });
 
             var playedSound = false;
@@ -3414,20 +3844,40 @@ GBCJS.prototype.BIT = function(test, value) {
             }
 
             var Channel = function(samples) {
-                this.speed = 0;
+                this.feq = 0;
                 this.samples = samples;
                 this.sampleIndex = 0;
                 this.leftVolume = 0;
                 this.rightVolume = 0;
             }
+            
+            var c2data = gfhfhfh(32, 0);
 
-            var gbchannels = [new Channel([0]), new Channel([0]), new Channel(gfhfhfh(32, 0)), new Channel([0])];
+            var gbchannels = [new Channel([0]), new Channel([0]), new Channel(c2data), new Channel([0])];
 
-            var channelDutyCycle = [0, 0];
+            var channelDutyCycle = [0, 0, 0, 0];
 
-            var wavDutyCycle = [gfhfhfh(100, 2), gfhfhfh(100, 3), gfhfhfh(100, 1), gfhfhfh(100, 4)];
+            var wavDutyCycle = [
+                [], 
+                [], 
+                [], 
+                []
+            ];
 
-            var sawto = gfhfhfh(100, 0);
+            var dutyLookup = [
+                [false, false, false, false, false, false, false, true],
+                [true, false, false, false, false, false, false, true],
+                [true, false, false, false, false, true, true, true],
+                [false, true, true, true, true, true, true, false]
+            ];
+            for (var i = 0; i < 8; i++) {
+                wavDutyCycle[0].push(dutyLookup[0][i] ? 0.5 : -0.5);
+                wavDutyCycle[1].push(dutyLookup[1][i] ? 0.5 : -0.5);
+                wavDutyCycle[2].push(dutyLookup[2][i] ? 0.5 : -0.5);
+                wavDutyCycle[3].push(dutyLookup[3][i] ? 0.5 : -0.5);
+            }
+
+            var sawto = gfhfhfh(32, 0);
 
             var WaveNoise1 = [];
             var WaveNoise2 = [];
@@ -3455,76 +3905,64 @@ GBCJS.prototype.BIT = function(test, value) {
             var audioRunning = true;
             var channelWav = [new Float32Array(1024), new Float32Array(1024), new Float32Array(1024), new Float32Array(1024)];
 
-            var AUDIO_BUFFERING = 512;
-            var SAMPLE_COUNT = 4 * 1024;
-            var SAMPLE_MASK = SAMPLE_COUNT - 1;
-
-            var outputLeft = new Float32Array(SAMPLE_COUNT);
-            var outputRight = new Float32Array(SAMPLE_COUNT);
-
-            var fgdgfdg = 0;
-            var sampleIndex = 2048;
-
-            function smindex() {
-                var ospeed = 44100 / audioContext.sampleRate;
-                for (var i = 0; i < 512; i++) {
-                    var sampleLeft = 0;
-                    var sampleRight = 0;
-                    if (audioRunning) {
-                        var gd = sampleIndex % 1024;
-                        channelWav[0][gd] = 0;
-                        channelWav[1][gd] = 0;
-                        channelWav[2][gd] = 0;
-                        channelWav[3][gd] = 0;
-                        for (var ch = 0; ch < 4; ch++) {
-                            var ch_left = gbchannels[ch].leftVolume;
-                            var ch_right = gbchannels[ch].rightVolume;
-                            var SquareWave = gbchannels[ch].samples;
-                            var iwav = gbchannels[ch].sampleIndex;
-                            if ((ch_left + ch_right) > 0) {
-                                iwav += ospeed * gbchannels[ch].speed;
-                                iwav = iwav % SquareWave.length;
-                                var res = SquareWave[(iwav % SquareWave.length) | 0] || 0;
-                                var rg = (gd - 512) * (ospeed * gbchannels[ch].speed);
-                                rg = (rg - (SquareWave.length / 2)) % SquareWave.length;
-                                if (rg < 0) rg += SquareWave.length;
-                                var res2 = SquareWave[rg | 0] || 0;
-                                channelWav[ch][gd] += (res2 * ch_left) + (res2 * ch_right) / 2;
-                                sampleLeft += res * ch_left;
-                                sampleRight += res * ch_right;
-                            } else {
-                                iwav = 0;
-                            }
-                            gbchannels[ch].sampleIndex = iwav;
-                        }   
-                    }
-                    outputLeft[sampleIndex % SAMPLE_COUNT] = sampleLeft;
-                    outputRight[sampleIndex % SAMPLE_COUNT] = sampleRight;
-                    sampleIndex++;
-                }
-            }
-
-            function writeSampleData(evt) {
-                smindex();
-                var output1 = evt.outputBuffer.getChannelData(0);
-                var output2 = evt.outputBuffer.getChannelData(1);
-                for (var i = 0; i < AUDIO_BUFFERING; i++) {
-                    if (audioRunning) {
-                        output1[i] = outputLeft[fgdgfdg % SAMPLE_COUNT];
-                        output2[i] = outputRight[fgdgfdg % SAMPLE_COUNT];
-                    } else {
-                        output1[i] = 0;
-                        output2[i] = 0;
-                    }
-                    fgdgfdg++;
-                }
-            }
+            var inputBufferPos = 0;
 
             var audioContext = new AudioContext();
 
-            var source = audioContext.createScriptProcessor(AUDIO_BUFFERING, 2, 2);
-            source.onaudioprocess = writeSampleData;
-            source.connect(audioContext.destination);
+            var ataudioh = new AtAudioBuf(audioContext);
+
+            var samplesPerFrame = Math.round(44100 * 0.008);
+            var outputLeft = new Float32Array(samplesPerFrame);
+            var outputRight = new Float32Array(samplesPerFrame);
+
+            gbc.onupdatewave = function() {
+                for (var i = 0; i < 32; i++) {
+                    c2data[i] = (gbc.WaveTable[i] - 8) / 16;
+                }
+                if (!gbc.DCPU16) gbchannels[2].sampleIndex = 0;
+            }
+
+            function smindex() {
+                for (var i = 0; i < samplesPerFrame; i++) {
+                    var gd = inputBufferPos % 1024;
+                    var sampleLeft = 0;
+                    var sampleRight = 0;
+                    channelWav[0][gd] = 0;
+                    channelWav[1][gd] = 0;
+                    channelWav[2][gd] = 0;
+                    channelWav[3][gd] = 0;
+                    for (var ch = 0; ch < 4; ch++) {
+                        var ch_left = gbchannels[ch].leftVolume;
+                        var ch_right = gbchannels[ch].rightVolume;
+                        var SquareWave = gbchannels[ch].samples;
+                        if ((ch_left + ch_right) > 0) {
+                            var speedf = 524228 / (gbchannels[ch].feq * 4);
+                            var rg = (gd - 512) * ((speedf * 0.32) / 440);
+                            rg = (rg - (SquareWave.length / 2)) % SquareWave.length;
+                            if (rg < 0) rg += SquareWave.length;
+                            var res2 = SquareWave[rg | 0] || 0;
+                            channelWav[ch][gd] += (res2 * ch_left) + (res2 * ch_right) / 2;
+                        }
+                    }
+                    for (var ch = 0; ch < 4; ch++) {
+                        var ch_left = gbchannels[ch].leftVolume;
+                        var ch_right = gbchannels[ch].rightVolume;
+                        var SquareWave = gbchannels[ch].samples;
+                        var iwav = gbchannels[ch].sampleIndex;
+                        var speedf = 524228 / (gbchannels[ch].feq * 4);
+                        iwav += (speedf * 0.32) / 440;
+                        iwav = iwav % SquareWave.length;
+                        var res = SquareWave[(iwav % SquareWave.length) | 0] || 0;
+                        sampleLeft += res * ch_left;
+                        sampleRight += res * ch_right;
+                        gbchannels[ch].sampleIndex = iwav;
+                    }
+                    outputLeft[i] = sampleLeft;
+                    outputRight[i] = sampleRight;
+                    inputBufferPos++;
+                }
+                ataudioh.nextBuffer(outputLeft, outputRight, samplesPerFrame);
+            }
 
             function loadGBFile(f) {
                 gb_filename = f.name || "";
@@ -3570,12 +4008,10 @@ GBCJS.prototype.BIT = function(test, value) {
             window.addEventListener("dragover", dragOverHandler);
 
             function playSound() {
-                if (audioContext.state == "running") {
+                if (ataudioh.isRunning()) {
                     if (!playedSound) {
-                        var _source = audioContext.createBufferSource();
-                        _source.connect(source);
-                        _source.start();
-                        playedSound = true;    
+                        ataudioh.start();
+                        playedSound = true;
                     }
                 } else {
                     audioContext.resume();
@@ -3611,26 +4047,27 @@ GBCJS.prototype.BIT = function(test, value) {
                 ctx.strokeStyle = "#fff";
                 ctx.stroke();
             }
-
             function stepAudio() {
                 var DCPU16 = gbc.DCPU16;
                 if (!DCPU16) {
-                    var c2data = gbchannels[2].samples;
-                    for (var i = 0; i < 32; i++) {
-                        c2data[i] = (gbc.WaveTable[i] - 8) / 16;
-                    }
                     if ((gbc.NoiseChannelWidthMode & 1) == 1) {
                         gbchannels[3].samples = WaveNoise2;
                     } else {
                         gbchannels[3].samples = WaveNoise1;
                     }    
                 }
+                var WaveChannelMult = Math.floor(gbc.WaveChannelMult);
+                if (WaveChannelMult < 1) WaveChannelMult = 1;
                 for (var ch = 0; ch < 4; ch++) {
-                    var volume = (gbc.AudioEngine[(ch * 9) + 6] / 100) * gbc.AudioEngineEnables[ch];
+                    var volume = gbc.AudioEngine[(ch * 9) + 6] / 100;
+                    if (!DCPU16) volume *= gbc.AudioEngineEnables[ch];
                     if (volume > 1) volume = 1;
                     volume /= 4;
                     if (DCPU16) {
-                        gbchannels[ch].samples = sawto;
+                        if (channelDutyCycle[ch] != -1) {
+                            gbchannels[ch].samples = sawto;
+                            channelDutyCycle[ch] = -1;
+                        }
                     } else {
                         if (ch < 2) {
                             var cDutyCycle = gbc.AudioEngineDutyCycle[ch] & 3;
@@ -3638,27 +4075,35 @@ GBCJS.prototype.BIT = function(test, value) {
                                 gbchannels[ch].samples = wavDutyCycle[cDutyCycle];
                                 channelDutyCycle[ch] = cDutyCycle;
                             }
-                        }    
-                    }
-                    var freq = gbc.AudioEngine[(ch * 9) + 7];
-                    if (freq > 0) {
-                        if (ch == 3) {
-                            gbchannels[ch].speed = freq / 5440;
-                            if (DCPU16) {
-                                volume = 0;
+                        } else if (ch == 2) {
+                            if (channelDutyCycle[ch] != 0) {
+                                gbchannels[ch].samples = c2data;
+                                channelDutyCycle[ch] = 0;
                             }
+                        }
+                    }
+                    var freq = gbc.AudioEngine[(ch * 9) + 1];
+                    if (DCPU16) {
+                        if (ch == 2) {
+                            gbchannels[ch].feq = (((0x800 - freq) << 1) / WaveChannelMult) | 0;
+                        } else {
+                            gbchannels[ch].feq = 0x800 - freq;
+                        }
+                    } else {
+                        if (ch == 3) {
+                            gbchannels[ch].feq = Math.max((freq & 0x7) << 4, 8) << (freq >> 4);
                         } else {
                             if (ch == 2) {
-                                if (DCPU16) {
-                                    gbchannels[ch].speed = (freq * Math.floor(gbc.WaveChannelMult)) / 440;
-                                    volume /= 2;
-                                } else {
-                                    gbchannels[ch].speed = (freq * 0.32) / 880;
-                                }
+                                gbchannels[ch].feq = (0x800 - freq) << 1;
                             } else {
-                                gbchannels[ch].speed = freq / 440;
+                                gbchannels[ch].feq = (0x800 - freq) << 2;
                             }
-                        }    
+                        }
+                    }
+                    if (ch == 3 && DCPU16) {
+                        volume = 0;
+                    } else if (ch == 2 && DCPU16) {
+                        volume /= 2;
                     }
                     if (DCPU16) {
                         gbchannels[ch].leftVolume = gbc.MasterVolume * volume;
@@ -3668,19 +4113,33 @@ GBCJS.prototype.BIT = function(test, value) {
                         gbchannels[ch].rightVolume = gbc.AudioEngineStereoRight[ch] * volume;
                     }
                 }
-                if (wavescene.style.display != "none") {
-                    drawWaveChannel();
-                }
             }
 
+            function rframe() {
+                playSound();
+                gbc.frame();
+                stepAudio();
+                smindex();
+                if (gbaudioencoder) {
+                    gbaudioencoder.putSamples(outputLeft, outputRight);
+                }
+            }
+            var startTime = Date.now();
+            var startTimeSub = 0;
             setInterval(function() { 
                 if (!gbPaused && (!document.hidden && !document.msHidden && !document.mozHidden && !document.webkitHidden)) {
-                    audioRunning = true;
-                    playSound();
-                    gbc.frame();
-                    stepAudio();
-                } else {
-                    audioRunning = false;
+                    var dt = Date.now() - startTime;
+                    if (dt < 0) dt = 0;
+                    if (dt > 16) dt = 16;
+                    startTime = Date.now();
+                    startTimeSub += dt;
+                    while (startTimeSub > 0) {
+                        rframe();
+                        startTimeSub -= 8;
+                    }
+                    if (wavescene.style.display != "none") {
+                        drawWaveChannel();
+                    }
                 }
             }, 8);
         </script>
