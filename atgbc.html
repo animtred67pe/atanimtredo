@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>gbc.js - EAAQ (2026-9-12)</title>
+        <title>gbc.js - EAAQ (2026-10-5)</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
@@ -60,6 +60,9 @@
                 <button onclick="gdfgdg_save_eram()">Save ERAM</button>
                 <button onclick="gdfgdg_clear_eram()" id="e_cleareram_e">Clear ERAM</button>
             </div>
+            <label>AutoSaveERAM:</label>
+            <input type="checkbox" id="aseramdfgfdg">
+            <br>
             <button id="ddgbc">Download .gbc</button>
             <button onclick="gdfgdg_reset()">Reset</button>
             <button onclick="gbfullscreenbtn()">Fullscreen</button>
@@ -298,82 +301,6 @@ AT_MobileKB.prototype.init = function() {
 }
         </script>
         <script>
-var AtAudioBuf = function(audioContext) {
-    this.audioContext = audioContext;
-    this.inputBufferL = new Float64Array(0x2000);
-    this.inputBufferR = new Float64Array(0x2000);
-    this.inputBufferPos = 4096;
-    this.inputReadPos = 0;
-    this.sampleRate = 44100;
-    this.fraction = 0;
-    this.thisSampleLeft = 0;
-    this.thisSampleRight = 0;
-    this.nextSampleLeft = 0;
-    this.nextSampleRight = 0;
-    this.source = this.audioContext.createScriptProcessor(2048, 2, 2);
-    this.source.onaudioprocess = this.writeSampleData.bind(this);
-    this.source.connect(audioContext.destination);
-    this._frames = 0;
-}
-AtAudioBuf.prototype.writeSampleData = function(evt) {
-    var output1 = evt.outputBuffer.getChannelData(0);
-    var output2 = evt.outputBuffer.getChannelData(1);
-    if (this._frames == 0) {
-        if ((this.inputReadPos + 2048) > this.inputBufferPos) {
-            this.inputReadPos = this.inputBufferPos - 4096;
-        }
-        var jghj = (this.inputReadPos + 4096) - this.inputBufferPos;
-        var b = this.inputBufferPos - 1;
-        for (var i = 0; i < 2048; i++) {
-            var a = this.inputReadPos;
-            if (a > b) a = b;
-            output1[i] = this.inputBufferL[a & 0x1fff];
-            output2[i] = this.inputBufferR[a & 0x1fff];
-            this.inputReadPos++;
-        }
-        if (jghj < 0) {
-            this.inputReadPos -= jghj;
-        }
-        this._frames++;
-    } else {
-        for (var i = 0; i < 2048; i++) {
-            output1[i] = 0;
-            output2[i] = 0;
-        }
-        this.inputReadPos = this.inputBufferPos - 4096;
-    }
-}
-AtAudioBuf.prototype.nextBuffer = function(left, right, samplesPerFrame) {
-    var stepSize = this.sampleRate / this.audioContext.sampleRate;
-    var oadd = 0;
-    while (oadd < samplesPerFrame) {
-        this.fraction += stepSize;
-        while (this.fraction >= 1) {
-            this.thisSampleLeft = this.nextSampleLeft;
-            this.thisSampleRight = this.nextSampleRight;
-            this.nextSampleLeft = left[oadd];
-            this.nextSampleRight = right[oadd];
-            oadd++;
-            this.fraction -= 1;
-        }
-        var valL = (this.fraction == 0) ? this.thisSampleLeft : this.thisSampleLeft + (this.fraction * (this.nextSampleLeft - this.thisSampleLeft));
-        var valR = (this.fraction == 0) ? this.thisSampleRight : this.thisSampleRight + (this.fraction * (this.nextSampleRight - this.thisSampleRight));
-        this.inputBufferL[this.inputBufferPos & 0x1fff] = valL;
-        this.inputBufferR[this.inputBufferPos & 0x1fff] = valR;
-        this.inputBufferPos++;    
-    }
-    this._frames = 0;
-}
-AtAudioBuf.prototype.isRunning = function() {
-    return this.audioContext.state == "running";
-}
-AtAudioBuf.prototype.start = function() {
-    var _source = audioContext.createBufferSource();
-    _source.connect(this.source);
-    _source.start();
-}
-        </script>
-        <script>
 var wavadpcm_stepTable = [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767];
 var wavadpcm_indexTable = [-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8];
 
@@ -584,6 +511,82 @@ ATWavAdpcmEncoder.prototype.getBytes = function() {
 };
         </script>
         <script>
+var AtAudioBuf = function(audioContext) {
+    this.audioContext = audioContext;
+    this.inputBufferL = new Float64Array(0x2000);
+    this.inputBufferR = new Float64Array(0x2000);
+    this.inputBufferPos = 4096;
+    this.inputReadPos = 0;
+    this.sampleRate = 44100;
+    this.fraction = 0;
+    this.thisSampleLeft = 0;
+    this.thisSampleRight = 0;
+    this.nextSampleLeft = 0;
+    this.nextSampleRight = 0;
+    this.source = this.audioContext.createScriptProcessor(2048, 2, 2);
+    this.source.onaudioprocess = this.writeSampleData.bind(this);
+    this.source.connect(audioContext.destination);
+    this._frames = 0;
+}
+AtAudioBuf.prototype.writeSampleData = function(evt) {
+    var output1 = evt.outputBuffer.getChannelData(0);
+    var output2 = evt.outputBuffer.getChannelData(1);
+    if (this._frames == 0) {
+        if ((this.inputReadPos + 2048) > this.inputBufferPos) {
+            this.inputReadPos = this.inputBufferPos - 4096;
+        }
+        var jghj = (this.inputReadPos + 4096) - this.inputBufferPos;
+        var b = this.inputBufferPos - 1;
+        for (var i = 0; i < 2048; i++) {
+            var a = this.inputReadPos;
+            if (a > b) a = b;
+            output1[i] = this.inputBufferL[a & 0x1fff];
+            output2[i] = this.inputBufferR[a & 0x1fff];
+            this.inputReadPos++;
+        }
+        if (jghj < 0) {
+            this.inputReadPos -= jghj;
+        }
+        this._frames++;
+    } else {
+        for (var i = 0; i < 2048; i++) {
+            output1[i] = 0;
+            output2[i] = 0;
+        }
+        this.inputReadPos = this.inputBufferPos - 4096;
+    }
+}
+AtAudioBuf.prototype.nextBuffer = function(left, right, samplesPerFrame) {
+    var stepSize = this.sampleRate / this.audioContext.sampleRate;
+    var oadd = 0;
+    while (oadd < samplesPerFrame) {
+        this.fraction += stepSize;
+        while (this.fraction >= 1) {
+            this.thisSampleLeft = this.nextSampleLeft;
+            this.thisSampleRight = this.nextSampleRight;
+            this.nextSampleLeft = left[oadd];
+            this.nextSampleRight = right[oadd];
+            oadd++;
+            this.fraction -= 1;
+        }
+        var valL = (this.fraction == 0) ? this.thisSampleLeft : this.thisSampleLeft + (this.fraction * (this.nextSampleLeft - this.thisSampleLeft));
+        var valR = (this.fraction == 0) ? this.thisSampleRight : this.thisSampleRight + (this.fraction * (this.nextSampleRight - this.thisSampleRight));
+        this.inputBufferL[this.inputBufferPos & 0x1fff] = valL;
+        this.inputBufferR[this.inputBufferPos & 0x1fff] = valR;
+        this.inputBufferPos++;    
+    }
+    this._frames = 0;
+}
+AtAudioBuf.prototype.isRunning = function() {
+    return this.audioContext.state == "running";
+}
+AtAudioBuf.prototype.start = function() {
+    var _source = audioContext.createBufferSource();
+    _source.connect(this.source);
+    _source.start();
+}
+        </script>
+        <script>
 /*
  * GameBoy Color Emulator By DCPU-16
  * 
@@ -606,25 +609,38 @@ var EAXDLogo = ["111110111100111110000010111000000000000000000000000000000000000
 function num_sign(_){if(_>0)return 1;else if(_<0)return-1;else return 0};
 function set_array(a,b){for(var i=0;i<a.length;i++)b[i]=a[i]};
 var GBCJS = function() {
-  this.runState = 0;
-    this.currentROMBank = 0;
-  this.ROMBankEdge = 0;
   this.DCPU16 = false;
   this.SkipBIOS = false;
   this.EnableMDC = true;
-  this.WaveChannelMult = 1;
   this.Frameskip = 0;
-  this.needsRender = false;
   this.turbo = false;
+  this.emulatorSpeed = 1;
+  this.AudioEngine = this.getTypedArray(36, "float64");
+  this.AudioEngineDutyCycle = this.getTypedArray(2, "float64");
+  this.AudioEngineDutyCycle[0] = 2;
+  this.AudioEngineDutyCycle[1] = 2;
+  this.AudioEngineEnables = this.getTypedArray(4, "float64");
+  this.AudioEngineStereoLeft = this.getTypedArray(4, "float64");
+  this.AudioEngineStereoRight = this.getTypedArray(4, "float64");
+  this.NoiseChannelWidthMode = 0;
+  this.MasterVolumeLeft = 0;
+  this.MasterVolumeRight = 0;
+  this.MasterVolume = 0;
+  this.CGB = 0;
   this.canvas = document.createElement("canvas");
   this.canvas.width = 160;
   this.canvas.height = 144;
+  this.runState = 0;
+    this.currentROMBank = 0;
+  this.ROMBankEdge = 0;
+  this.updateeram = 0;
+  this.WaveChannelMult = 1;
+  this.needsRender = false;
   this.ctx = this.canvas.getContext("2d");
   this.imageData = this.ctx.createImageData(160, 144);
   this.imageData2 = this.ctx.createImageData(160, 144);
   this.imageDataOutput = this.ctx.createImageData(160, 144);
   this.name = "";
-  this.gameCode = "";
   this.inbios = 0;
   this.PC = 0;
   this.CPUSpeed = 1;
@@ -652,18 +668,6 @@ var GBCJS = function() {
   this.LCDStatIns = this.getTypedArray(4, "float64");
   this.Pallete = this.getTypedArray(4, "float64");
   this.SpritePal = this.getTypedArray(8, "float64");
-  this.AudioEngine = this.getTypedArray(36, "float64");
-  this.AudioEngineDutyCycle = this.getTypedArray(2, "float64");
-  this.AudioEngineDutyCycle[0] = 2;
-  this.AudioEngineDutyCycle[1] = 2;
-  this.AudioEngineEnables = this.getTypedArray(4, "float64");
-  this.AudioEngineStereoLeft = this.getTypedArray(4, "float64");
-  this.AudioEngineStereoRight = this.getTypedArray(4, "float64");
-  this.NoiseChannelWidthMode = 0;
-  this.MasterVolumeLeft = 0;
-  this.MasterVolumeRight = 0;
-  this.MasterVolume = 0;
-  this.CGB = 0;
   this.CGBBGPalCol = this.getTypedArray(32, "float64");
   this.CGBSprPalCol = this.getTypedArray(32, "float64");
   this.CGBBGPalReg = this.getTypedArray(64, "float64");
@@ -677,7 +681,6 @@ var GBCJS = function() {
   this.Tiles = [];
   this.audioCycles = 0;
   this.soundPhase = 0;
-  this.emulatorSpeed = 1;
   this._ticks = 0;
 }
 GBCJS.prototype.getTypedArray = function(len, type) {
@@ -712,8 +715,6 @@ GBCJS.prototype.saveState = function() {
     this.ROM,
     this.currentROMBank,
     this.ROMBankEdge,
-    this.name,
-    this.gameCode,
     this.inbios,
     this.PC,
     this.AudioFrames,
@@ -762,8 +763,6 @@ GBCJS.prototype.loadState = function(state) {
   this.ROM = state[index++];
     this.currentROMBank = state[index++];
     this.ROMBankEdge = state[index++];
-  this.name = state[index++];
-  this.gameCode = state[index++];
   this.inbios = state[index++];
   this.PC = state[index++];
   this.AudioFrames = state[index++];
@@ -796,6 +795,7 @@ GBCJS.prototype.loadState = function(state) {
   set_array(state[index++], this.MBC);
   this.ERAM = [];
   set_array(state[index++], this.ERAM);
+  this.updateeram = 1;
   set_array(state[index++], this.iREQs);
   set_array(state[index++], this.ZRAM);
   var _tiles = state[index++];
@@ -841,20 +841,14 @@ GBCJS.prototype.clearScene = function() {
     imgData[i + 3] = imgData2[i + 3] = 0;
   }
 }
+GBCJS.prototype.getERAM = function() {
+  return this.ERAM;
+}
+GBCJS.prototype.setERAM = function(data) {
+  this.ERAM = new Uint8Array(data);
+}
 GBCJS.prototype.initSystem = function() {
   this.clearScene();
-  this.name = "";
-    for (var index = 0x134; index < 0x13F; index++) {
-        if (this.ROM[index] > 0) {
-            this.name += String.fromCharCode(this.ROM[index]);
-        }
-    }
-  this.gameCode = "";
-    for (var index = 0x13F; index < 0x143; index++) {
-        if (this.ROM[index] > 0) {
-            this.gameCode += String.fromCharCode(this.ROM[index]);
-        }
-    }
   this.WaveTable = this.getTypedArray(32, "float64");
   this.AudioFrames = 0;
   this.audioCycles = 0;
@@ -998,6 +992,12 @@ GBCJS.prototype.frame = function() {
       this.runState = 0;
     }
     this._ticks--;
+  }
+  if (this.updateeram == 1) {
+    if (this.onupdateeram) {
+      this.onupdateeram();
+    }
+    this.updateeram = 0;
   }
   if (this.needsRender) {
     this.Draw(false, false);
@@ -1481,23 +1481,19 @@ GBCJS.prototype.IdleSkip = function() {
   if ((this.ZRAM[263] % 8) > 3) {
     var i = TimerMods[this.ZRAM[263] % 4];
     result = Math.floor(lastmemory / i);
-    if (((lastmemory % i) + (this.TimerDiv % i)) > (i - 1)) {
+    if (((lastmemory % i) + (this.TimerDiv % i)) > (i - 1)) 
       result++;
-    }
     this.ZRAM[261] = this.ZRAM[262] + (((this.ZRAM[261] - this.ZRAM[262]) + result) % (256 - this.ZRAM[262]));
   }
   this.TimerDiv += lastmemory;
   this.TimerDiv = this.TimerDiv % 64;
   this.TimerClock -= (lastmemory * 16);
-  if (!((skipTo < skipCycle1) || (skipCycle1 == 200000))) {
+  if (!((skipTo < skipCycle1) || (skipCycle1 == 200000))) 
     this.iREQ |= 1;
-  }
-  if (!((skipTo < skipCycle2) || (skipCycle2 == 200000))) {
+  if (!((skipTo < skipCycle2) || (skipCycle2 == 200000))) 
     this.iREQ |= 2;
-  }
-  if (!((skipTo < skipCycle3) || (skipCycle3 == 200000))) {
+  if (!((skipTo < skipCycle3) || (skipCycle3 == 200000))) 
     this.iREQ |= 4;
-  }
 }
 GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
   if (this.CGB == 1) {
@@ -1507,7 +1503,7 @@ GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
     var result = 128;
     for (var i = 0; i < 8; i++) {
       bt.push(Math.floor(this.ZRAM[320] / result) & 1);
-      result = result / 2;
+      result /= 2;
     }
     var color = 0;
     var TileNumber = 1;
@@ -1521,9 +1517,7 @@ GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
     var osx = 0;
     var tileLocation = 0;
     var tileincmentor = 0;
-    for (var __ = 0; __ < 160; __++) {
-      this.DrawDot(__, sy, ScreenColours[0]);
-    }
+    this.DrawLine(0, 160, sy, ScreenColours[0]);
     if (bt[0] == 1) {
       if (bt[7] == 1) {
         spriteX = sx;
@@ -1549,10 +1543,8 @@ GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
         while(!(lastmemory > 159)) {
           color = this.Pallete[+result[bgxfine - 1] - 1];
           spriteX += +tileincmentor[bgxfine - 1] || 0;
-          while(spriteX != osx) {
-            this.DrawDot(osx, sy, color);
-            osx++;
-          }
+          this.DrawLine(osx, spriteX, sy, color);
+          osx = spriteX;
           lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
           bgxfine++;
           if (bgxfine > result.length) {
@@ -1593,10 +1585,8 @@ GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
         while(!(lastmemory > 159)) {
           color = this.Pallete[+result[bgxfine - 1] - 1];
           spriteX += +tileincmentor[bgxfine - 1] || 0;
-          while(spriteX != osx) {
-            this.DrawDot(osx, sy, color);
-            osx++;
-          }
+          this.DrawLine(osx, spriteX, sy, color);
+          osx = spriteX;
           lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
           bgxfine++;
           if (bgxfine > result.length) {
@@ -1650,14 +1640,8 @@ GBCJS.prototype.LCDDrawLine = function(number1, sx, sy) {
                 }
                 osx = spriteX;
                 spriteX += (((+result[tileLocation - 1]) - 1) * TileNumber) || 0;
-                var gfgd = 32;
-                while(spriteX != osx && gfgd > 0) {
-                  this.DrawDot(osx, sy, color);
-                  var jh = num_sign(spriteX - osx);
-                  osx += jh;
-                  gfgd--;
-                }
-                this.DrawDot(osx, sy, color);
+                this.DrawLine(osx, spriteX, sy, color);
+                this.DrawDot(spriteX, sy, color);
                 spriteX += TileNumber;
               }
               bgxfine += (+result[tileLocation - 1]) || 0;
@@ -1675,7 +1659,7 @@ GBCJS.prototype.CGB_LCDDrawLine = function(number1, sx, sy) {
   var result = 128;
   for (var i = 0; i < 8; i++) {
     bt.push(Math.floor(this.ZRAM[320] / result) & 1);
-    result = result / 2;
+    result /= 2;
   }
   var color = 0;
   var TileNumber = 1;
@@ -1693,9 +1677,7 @@ GBCJS.prototype.CGB_LCDDrawLine = function(number1, sx, sy) {
   var drawPalnum = 0;
   var draw_yPx = 0;
   var draw_xFineDir = 0;
-  for (var __ = 0; __ < 160; __++) {
-    this.DrawDot(__, sy, 0xFFFFFF);
-  }
+  this.DrawLine(0, 160, sy, 0xFFFFFF);
   if (bt[0] == 1) {
     if (bt[7] == 1) {
       spriteX = sx;
@@ -1737,10 +1719,8 @@ GBCJS.prototype.CGB_LCDDrawLine = function(number1, sx, sy) {
       while(!(lastmemory > 159)) {
         color = this.CGBBGPalCol[(+result[bgxfine - 1] + drawPalnum) - 1];
         spriteX += +tileincmentor[bgxfine - 1] || 0;
-        while(spriteX != osx) {
-          this.DrawDot(osx, sy, color);
-          osx++;
-        }
+        this.DrawLine(osx, spriteX, sy, color);
+        osx = spriteX;
         lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
         bgxfine += draw_xFineDir;
         if (bgxfine > result.length || bgxfine == 0) {
@@ -1813,10 +1793,8 @@ GBCJS.prototype.CGB_LCDDrawLine = function(number1, sx, sy) {
       while(!(lastmemory > 159)) {
         color = this.CGBBGPalCol[(+result[bgxfine - 1] + drawPalnum) - 1];
         spriteX += +tileincmentor[bgxfine - 1] || 0;
-        while(spriteX != osx) {
-          this.DrawDot(osx, sy, color);
-          osx++;
-        }
+        this.DrawLine(osx, spriteX, sy, color);
+        osx = spriteX;
         lastmemory += (+tileincmentor[bgxfine - 1]) || 0;
         bgxfine += draw_xFineDir;
         if (bgxfine > result.length || bgxfine == 0) {
@@ -1886,14 +1864,8 @@ GBCJS.prototype.CGB_LCDDrawLine = function(number1, sx, sy) {
               color = this.CGBSprPalCol[fhgfh - 1];
               osx = spriteX;
               spriteX += (((+result[tileLocation - 1]) - 1) * TileNumber) || 0;
-              var gfgd = 32;
-              while(spriteX != osx && gfgd > 0) {
-                this.DrawDot(osx, sy, color);
-                var jh = num_sign(spriteX - osx);
-                osx += jh;
-                gfgd--;
-              }
-              this.DrawDot(osx, sy, color);
+              this.DrawLine(osx, spriteX, sy, color);
+              this.DrawDot(spriteX, sy, color);
               spriteX += TileNumber;
             }
             bgxfine += (+result[tileLocation - 1]) || 0;
@@ -1917,6 +1889,15 @@ GBCJS.prototype.DrawDot = function(x, y, color) {
     data[i + 2] = b;
     data[i + 3] = 255;    
     this.needsRender = true;
+  }
+}
+GBCJS.prototype.DrawLine = function(x1, x2, y, color) {
+  var gfgd = 1024;
+  while(x2 != x1 && gfgd > 0) {
+    this.DrawDot(x1, y, color);
+    var jh = num_sign(x2 - x1);
+    x1 += jh;
+    gfgd--;
   }
 }
 GBCJS.prototype.MMU_read_byte = function(location) {
@@ -2077,6 +2058,7 @@ GBCJS.prototype.MMU_write_byte = function(value, location) {
       if (0xC000 > location) {
         if (this.MBC[4] == 1) {
           this.ERAM[(location - 40960) + (this.MBC[7] * 8196)] = value;
+          this.updateeram = 1;
         }
       } else {
         if (0xE000 > location) {
@@ -3325,6 +3307,7 @@ GBCJS.prototype.BIT = function(test, value) {
             var gb_frameskip_gb = document.getElementById('gb_frameskip_gb');
             var gb_speed_gb = document.getElementById('gb_speed_gb');
             var gb_scale_gb = document.getElementById('gb_scale_gb');
+            var aseramdfgfdg = document.getElementById('aseramdfgfdg');
             var gdfdfgdfgdg_atmkb = document.getElementById('gdfdfgdfgdg_atmkb');
             var txtgbrom = document.getElementById('txtgbrom');
             var gbaudiocb = document.getElementById('gbaudiocb');
@@ -3345,6 +3328,16 @@ GBCJS.prototype.BIT = function(test, value) {
             var ctx = wavescene.getContext("2d");
 
             var dsB = true;
+
+            var autosavee = false;
+
+            aseramdfgfdg.checked = localStorage.getItem("atgb_autosaveeram") == "true";
+            autosavee = aseramdfgfdg.checked;
+
+            aseramdfgfdg.addEventListener("click", function(e) {
+                autosavee = e.target.checked;
+                localStorage.setItem("atgb_autosaveeram", "" + autosavee);
+            });
 
             function gbmenubtn() {
                 if (gbPaused) {
@@ -3478,7 +3471,7 @@ GBCJS.prototype.BIT = function(test, value) {
                 try {
                     var dfgdfg = localStorage.getItem("atgb_eram_" + gbc.getROMName()) || "";
                     if (dfgdfg.length) {
-                        gbc.ERAM = strHexToData(dfgdfg);
+                        gbc.setERAM(strHexToData(dfgdfg));
                         e_cleareram_e.style.display = "";
                     } else {
                         e_cleareram_e.style.display = "none";
@@ -3488,7 +3481,7 @@ GBCJS.prototype.BIT = function(test, value) {
                 }
             }
             function gdfgdg_save_eram() {
-                var ERAM = gbc.ERAM;
+                var ERAM = gbc.getERAM();
                 if (ERAM.length) {
                     localStorage.setItem("atgb_eram_" + gbc.getROMName(), dataToStrHex(ERAM));
                     e_cleareram_e.style.display = "";
@@ -3773,16 +3766,15 @@ GBCJS.prototype.BIT = function(test, value) {
                 if (e.keyCode == 84) {
                     gbc.turbo = true;
                 }
-                /*
                 if (e.keyCode == 57) {
-                    gbc.ROM = [];
+                    //gbc.ROM = [];
                 }
                 if (e.keyCode == 56) {
-                    gdfgdg_emptyflag();
+                    //gdfgdg_emptyflag();
                 }
                 if (e.keyCode == 55) {
-                    gbc.ERAM = new Uint8Array(0);
-                }*/
+                    //gbc.ERAM = new Uint8Array(0);
+                }
                 if (e.keyCode == 81) {
                     GB_STATE = gbc.saveState();
                 }
@@ -4124,14 +4116,23 @@ GBCJS.prototype.BIT = function(test, value) {
                     gbaudioencoder.putSamples(outputLeft, outputRight);
                 }
             }
+            var fdggfd = 0;
+            gbc.onupdateeram = function() {
+                if (fdggfd > 200) {
+                    if (autosavee) gdfgdg_save_eram();
+                    fdggfd = 0;
+                }
+            }
             var startTime = Date.now();
             var startTimeSub = 0;
             setInterval(function() { 
                 if (!gbPaused && (!document.hidden && !document.msHidden && !document.mozHidden && !document.webkitHidden)) {
-                    var dt = Date.now() - startTime;
+                    var _time = Date.now();
+                    var dt = _time - startTime;
                     if (dt < 0) dt = 0;
                     if (dt > 16) dt = 16;
-                    startTime = Date.now();
+                    startTime = _time;
+                    fdggfd += dt;
                     startTimeSub += dt;
                     while (startTimeSub > 0) {
                         rframe();
