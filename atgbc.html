@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>gbc.js - EAAQ (2026-11-2)</title>
+        <title>gbc.js - EAAQ (2026-11-16)</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
@@ -513,8 +513,8 @@ ATWavAdpcmEncoder.prototype.getBytes = function() {
         <script>
 var AtAudioBuf = function(audioContext) {
     this.audioContext = audioContext;
-    this.inputBufferL = new Float64Array(0x2000);
-    this.inputBufferR = new Float64Array(0x2000);
+    this.inputBufferL = new Float64Array(0x10000);
+    this.inputBufferR = new Float64Array(0x10000);
     this.inputBufferPos = 4096;
     this.inputReadPos = 0;
     this.sampleRate = 44100;
@@ -522,8 +522,19 @@ var AtAudioBuf = function(audioContext) {
     this.thisSampleLeft = 0;
     this.thisSampleRight = 0;
     this.nextSampleLeft = 0;
+    var r = audioContext.sampleRate / 48000;
+    if (r > 6) {
+        this.s1 = 2048*8;
+    } else if (r > 3) {
+        this.s1 = 2048*4;
+    } else if (r > 1.5) {
+        this.s1 = 2048*2;
+    } else {
+        this.s1 = 2048;
+    }
+    this.pp = this.s1*2;
     this.nextSampleRight = 0;
-    this.source = this.audioContext.createScriptProcessor(2048, 2, 2);
+    this.source = this.audioContext.createScriptProcessor(this.s1, 2, 2);
     this.source.onaudioprocess = this.writeSampleData.bind(this);
     this.source.connect(audioContext.destination);
     this._frames = 0;
@@ -531,17 +542,17 @@ var AtAudioBuf = function(audioContext) {
 AtAudioBuf.prototype.writeSampleData = function(evt) {
     var output1 = evt.outputBuffer.getChannelData(0);
     var output2 = evt.outputBuffer.getChannelData(1);
-    if (this._frames == 0) {
-        if ((this.inputReadPos + 2048) > this.inputBufferPos) {
-            this.inputReadPos = this.inputBufferPos - 4096;
+    if (this._frames <= 0) {
+        if ((this.inputReadPos + (this.s1)) > this.inputBufferPos) {
+            this.inputReadPos = this.inputBufferPos - this.pp;
         }
-        var jghj = (this.inputReadPos + 4096) - this.inputBufferPos;
+        var jghj = (this.inputReadPos + this.pp) - this.inputBufferPos;
         var b = this.inputBufferPos - 1;
-        for (var i = 0; i < 2048; i++) {
+        for (var i = 0; i < this.s1; i++) {
             var a = this.inputReadPos;
             if (a > b) a = b;
-            output1[i] = this.inputBufferL[a & 0x1fff];
-            output2[i] = this.inputBufferR[a & 0x1fff];
+            output1[i] = this.inputBufferL[a & 0xffff];
+            output2[i] = this.inputBufferR[a & 0xffff];
             this.inputReadPos++;
         }
         if (jghj < 0) {
@@ -549,31 +560,38 @@ AtAudioBuf.prototype.writeSampleData = function(evt) {
         }
         this._frames++;
     } else {
-        for (var i = 0; i < 2048; i++) {
+        for (var i = 0; i < this.s1; i++) {
             output1[i] = 0;
             output2[i] = 0;
         }
-        this.inputReadPos = this.inputBufferPos - 4096;
+        this.inputReadPos = this.inputBufferPos - this.pp;
     }
 }
 AtAudioBuf.prototype.nextBuffer = function(left, right, samplesPerFrame) {
     var stepSize = this.sampleRate / this.audioContext.sampleRate;
-    var oadd = 0;
-    while (oadd < samplesPerFrame) {
-        this.fraction += stepSize;
-        while (this.fraction >= 1) {
-            this.thisSampleLeft = this.nextSampleLeft;
-            this.thisSampleRight = this.nextSampleRight;
-            this.nextSampleLeft = left[oadd];
-            this.nextSampleRight = right[oadd];
-            oadd++;
-            this.fraction -= 1;
-        }
-        var valL = (this.fraction == 0) ? this.thisSampleLeft : this.thisSampleLeft + (this.fraction * (this.nextSampleLeft - this.thisSampleLeft));
-        var valR = (this.fraction == 0) ? this.thisSampleRight : this.thisSampleRight + (this.fraction * (this.nextSampleRight - this.thisSampleRight));
-        this.inputBufferL[this.inputBufferPos & 0x1fff] = valL;
-        this.inputBufferR[this.inputBufferPos & 0x1fff] = valR;
-        this.inputBufferPos++;    
+    if ((stepSize > 0) && isFinite(stepSize)) {
+        var oadd = 0;
+        bstop: while (oadd < samplesPerFrame) {
+            var lfraction = this.fraction;
+            this.fraction += stepSize;
+            while (this.fraction >= 1) {
+                if (oadd >= samplesPerFrame) {
+                    this.fraction = lfraction;
+                    break bstop;
+                }
+                this.thisSampleLeft = this.nextSampleLeft;
+                this.thisSampleRight = this.nextSampleRight;
+                this.nextSampleLeft = left[oadd];
+                this.nextSampleRight = right[oadd];
+                oadd++;
+                this.fraction -= 1;
+            }
+            var valL = (this.fraction == 0) ? this.thisSampleLeft : this.thisSampleLeft + (this.fraction * (this.nextSampleLeft - this.thisSampleLeft));
+            var valR = (this.fraction == 0) ? this.thisSampleRight : this.thisSampleRight + (this.fraction * (this.nextSampleRight - this.thisSampleRight));
+            this.inputBufferL[this.inputBufferPos & 0xffff] = valL;
+            this.inputBufferR[this.inputBufferPos & 0xffff] = valR;
+            this.inputBufferPos++;    
+        }    
     }
     this._frames = 0;
 }
