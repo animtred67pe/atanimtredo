@@ -2028,7 +2028,7 @@ SpinningCubeNES.prototype.UpdateAudio = function() {
     } else {
       if (this.APU_old_Periods[ch] != this.APU_Periods[ch]) {
         if (ch == 3) {
-          this.APU_Frequencies[ch] = this.CPU_Clock_Rate_Hz / (96 * (this.APU_Periods[ch] + 1));
+          this.APU_Frequencies[ch] = this.CPU_Clock_Rate_Hz / (100 * this.APU_Periods[ch]);
         } else {
           if (ch != 2) {
             this.APU_Frequencies[ch] = this.CPU_Clock_Rate_Hz / (16 * (this.APU_Periods[ch] + 1));
